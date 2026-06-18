@@ -1,0 +1,10 @@
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net481\GmsSvn.ShellBridge.csproj.AssemblyReference.cache
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net481\GmsSvn.ShellBridge.GeneratedMSBuildEditorConfig.editorconfig
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net481\GmsSvn.ShellBridge.AssemblyInfoInputs.cache
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net481\GmsSvn.ShellBridge.AssemblyInfo.cs
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net481\GmsSvn.ShellBridge.csproj.CoreCompileInputs.cache
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\bin\Release\net481\GmsSvn.ShellBridge.exe.config
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\bin\Release\net481\GmsSvn.ShellBridge.exe
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\bin\Release\net481\GmsSvn.ShellBridge.pdb
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net481\GmsSvn.ShellBridge.exe
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net481\GmsSvn.ShellBridge.pdb

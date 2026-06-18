@@ -1,0 +1,298 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  username     String        @unique
+  email        String        @unique
+  passwordHash String        @map("password_hash")
+  isAdmin      Boolean       @default(false) @map("is_admin")
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  groupMembers GroupMember[]
+  auditLogs    AuditLog[]
+  createdIssues    RepoIssue[]     @relation("IssueCreator")
+  assignedIssues   RepoIssue[]     @relation("IssueAssignee")
+  wikiPagesUpdated WikiPage[]
+  reviewRequests   ReviewRequest[] @relation("ReviewRequester")
+  reviewsCompleted ReviewRequest[] @relation("ReviewReviewer")
+
+  @@map("users")
+}
+
+model Group {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  description  String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  members      GroupMember[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  groupId   String   @map("group_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@map("group_members")
+}
+
+model Repository {
+  id              String         @id @default(uuid())
+  name            String         @unique
+  slug            String         @unique
+  svnUrl          String?        @map("svn_url")
+  status          RepoStatus     @default(PENDING)
+  latestRevision  Int?           @map("latest_revision")
+  sizeBytes       BigInt?        @map("size_bytes")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  agentCommands   AgentCommand[]
+  accessRules     RepoAccessRule[]
+  issues          RepoIssue[]
+  wikiPages       WikiPage[]
+  reviewRequests  ReviewRequest[]
+  pipelineConfig  RepoPipelineConfig?
+  pipelineBuilds  PipelineBuild[]
+
+  @@map("repositories")
+}
+
+enum AccessLevel {
+  READ
+  WRITE
+  NONE
+}
+
+enum PrincipalType {
+  USER
+  GROUP
+}
+
+model RepoAccessRule {
+  id            String         @id @default(uuid())
+  repositoryId  String         @map("repository_id")
+  path          String
+  principalType PrincipalType  @map("principal_type")
+  principalName String         @map("principal_name")
+  access        AccessLevel
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  repository    Repository     @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, path, principalType, principalName])
+  @@index([repositoryId])
+  @@map("repo_access_rules")
+}
+
+enum AgentCommandStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model AgentCommand {
+  id             String             @id @default(uuid())
+  commandType    String             @map("command_type")
+  idempotencyKey String             @unique @map("idempotency_key")
+  correlationId  String             @map("correlation_id")
+  payload        Json
+  status         AgentCommandStatus @default(PENDING)
+  result         Json?
+  repositoryId   String?            @map("repository_id")
+  requestedById  String?            @map("requested_by_id")
+  startedAt      DateTime?          @map("started_at")
+  completedAt    DateTime?          @map("completed_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  repository     Repository?        @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([correlationId])
+  @@index([createdAt])
+  @@map("agent_commands")
+}
+
+enum RepoStatus {
+  PENDING
+  ACTIVE
+  ARCHIVED
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  action         String
+  userId         String?  @map("user_id")
+  repositoryId   String?  @map("repository_id")
+  metadata       Json?
+  sourceIp       String?  @map("source_ip")
+  sourceMachine  String?  @map("source_machine")
+  createdAt      DateTime @default(now()) @map("created_at")
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PlatformSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+enum IssuePriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+model RepoIssue {
+  id           String        @id @default(uuid())
+  repositoryId String        @map("repository_id")
+  number       Int
+  title        String
+  description  String?
+  status       IssueStatus   @default(OPEN)
+  priority     IssuePriority @default(NORMAL)
+  createdById  String        @map("created_by_id")
+  assigneeId   String?       @map("assignee_id")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  repository   Repository    @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdBy    User          @relation("IssueCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  assignee     User?         @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@unique([repositoryId, number])
+  @@index([repositoryId])
+  @@map("repo_issues")
+}
+
+model WikiPage {
+  id           String     @id @default(uuid())
+  repositoryId String     @map("repository_id")
+  slug         String
+  title        String
+  content      String     @db.Text
+  updatedById  String     @map("updated_by_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  updatedBy    User       @relation(fields: [updatedById], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, slug])
+  @@index([repositoryId])
+  @@map("wiki_pages")
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ReviewRequest {
+  id           String       @id @default(uuid())
+  repositoryId String       @map("repository_id")
+  title        String
+  svnPath      String       @map("svn_path")
+  revision     Int?
+  description  String?
+  status       ReviewStatus @default(PENDING)
+  requesterId  String       @map("requester_id")
+  reviewerId   String?      @map("reviewer_id")
+  reviewNote   String?      @map("review_note")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  reviewedAt   DateTime?    @map("reviewed_at")
+  repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  requester    User         @relation("ReviewRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  reviewer     User?        @relation("ReviewReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([repositoryId])
+  @@index([status])
+  @@map("review_requests")
+}
+
+enum BuildStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+model RepoPipelineConfig {
+  id              String          @id @default(uuid())
+  repositoryId    String          @unique @map("repository_id")
+  enabled         Boolean         @default(false)
+  webhookUrl      String?         @map("webhook_url")
+  webhookSecret   String?         @map("webhook_secret")
+  triggerPaths    String[]        @default(["/trunk"]) @map("trigger_paths")
+  triggerBranches String[]        @default(["trunk"]) @map("trigger_branches")
+  hookInstalled   Boolean         @default(false) @map("hook_installed")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  repository      Repository      @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  builds          PipelineBuild[]
+
+  @@map("repo_pipeline_configs")
+}
+
+model PipelineBuild {
+  id              String             @id @default(uuid())
+  repositoryId    String             @map("repository_id")
+  configId        String?            @map("config_id")
+  revision        Int
+  status          BuildStatus        @default(QUEUED)
+  durationMs      Int?               @map("duration_ms")
+  logUrl          String?            @map("log_url")
+  externalBuildId String?            @map("external_build_id")
+  errorMessage    String?            @map("error_message")
+  changedPaths    String[]           @default([]) @map("changed_paths")
+  author          String?
+  triggeredAt     DateTime           @default(now()) @map("triggered_at")
+  completedAt     DateTime?          @map("completed_at")
+  idempotencyKey  String             @unique @map("idempotency_key")
+  repository      Repository         @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  config          RepoPipelineConfig? @relation(fields: [configId], references: [id], onDelete: SetNull)
+
+  @@unique([repositoryId, revision])
+  @@index([repositoryId, triggeredAt])
+  @@index([status])
+  @@map("pipeline_builds")
+}

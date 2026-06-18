@@ -1,0 +1,38 @@
+{
+  "name": "gms-svn",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GMS SVN Platform — simple SVN admin + VisualSVN + Windows client",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/ensure-electron.mjs",
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run dev --workspace=@gms-svn/api",
+    "dev:web": "npm run dev --workspace=@gms-svn/web",
+    "dev:client": "npm run dev --workspace=@gms-svn/client",
+    "build:client": "npm run build --workspace=@gms-svn/client",
+    "pack:client": "powershell -ExecutionPolicy Bypass -File infra/installer/build-single-client-installer.ps1 -SignInstaller",
+    "pack:client:remote": "powershell -ExecutionPolicy Bypass -File infra/installer/build-client-for-remote.ps1 -ServerHost 192.168.1.133 -ApiBaseUrl http://192.168.1.133:3001 -VisualSvnUrl svn://192.168.1.133:3690 -SignInstaller",
+    "pack:client:full": "npm run pack:client",
+    "bundle:client": "powershell -ExecutionPolicy Bypass -File infra/installer/bundle-client-deployment.ps1",
+    "build:shell": "dotnet build apps/shell-extension/GmsSvn.Shell.sln -c Release",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace=@gms-svn/api",
+    "db:migrate": "npm run db:migrate --workspace=@gms-svn/api",
+    "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infra/docker/docker-compose.yml down",
+    "db:seed": "npm run db:seed --workspace=@gms-svn/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

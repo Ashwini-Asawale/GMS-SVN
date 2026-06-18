@@ -1,0 +1,63 @@
+{
+  "appId": "com.gms.svn.client",
+  "productName": "GMS SVN CLIENT",
+  "copyright": "Copyright © 2026 GMS",
+  "compression": "store",
+  "electronLanguages": ["en-US"],
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "out/**/*",
+    "package.json"
+  ],
+  "extraFiles": [
+    {
+      "from": ".shell-publish",
+      "to": "explorer",
+      "filter": [
+        "GmsSvn.ShellBridge.exe",
+        "GmsSvn.ShellBridge.exe.config",
+        "GmsSvn.ShellExtension.dll",
+        "SharpShell.dll"
+      ]
+    },
+    {
+      "from": ".svn-publish",
+      "to": "svn",
+      "filter": ["**/*"]
+    },
+    {
+      "from": "build/gms-svn-client.config.json",
+      "to": "."
+    },
+    {
+      "from": "build/register-shell.ps1",
+      "to": "."
+    },
+    {
+      "from": "build/refresh-explorer.ps1",
+      "to": "."
+    },
+    {
+      "from": "build/signing/GMS-CodeSigning.cer",
+      "to": "."
+    }
+  ],
+  "electronVersion": "34.5.8",
+  "win": {
+    "target": ["nsis"],
+    "signAndEditExecutable": false,
+    "requestedExecutionLevel": "requireAdministrator",
+    "artifactName": "GMS-SVN-CLIENT-Setup-${version}.${ext}"
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": true,
+    "allowElevation": true,
+    "createDesktopShortcut": true,
+    "runAfterFinish": false,
+    "shortcutName": "GMS SVN CLIENT",
+    "include": "build/installer.nsh"
+  }
+}

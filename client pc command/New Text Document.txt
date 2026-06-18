@@ -1,0 +1,2 @@
+cd D:\GMS-SVN
+npm run pack:client:full

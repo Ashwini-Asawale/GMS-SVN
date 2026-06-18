@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "/F998mxgX+c=",
+  "success": true,
+  "projectFilePath": "D:\\GMS-SVN\\apps\\shell-extension\\src\\GmsSvn.ShellBridge\\GmsSvn.ShellBridge.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Admin\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.3\\microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
+    "C:\\Users\\Admin\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net48\\1.0.3\\microsoft.netframework.referenceassemblies.net48.1.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}

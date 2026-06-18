@@ -1,0 +1,17 @@
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net8.0-windows\GmsSvn.ShellExtension.csproj.AssemblyReference.cache
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net8.0-windows\GmsSvn.ShellExtension.GeneratedMSBuildEditorConfig.editorconfig
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net8.0-windows\GmsSvn.ShellExtension.AssemblyInfoInputs.cache
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net8.0-windows\GmsSvn.ShellExtension.AssemblyInfo.cs
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net8.0-windows\GmsSvn.ShellExtension.csproj.CoreCompileInputs.cache
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\bin\Release\net8.0-windows\GmsSvn.ShellExtension.comhost.dll
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\bin\Release\net8.0-windows\GmsSvn.ShellExtension.deps.json
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\bin\Release\net8.0-windows\GmsSvn.ShellExtension.runtimeconfig.json
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\bin\Release\net8.0-windows\GmsSvn.ShellExtension.dll
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\bin\Release\net8.0-windows\GmsSvn.ShellExtension.pdb
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\bin\Release\net8.0-windows\SharpShell.dll
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net8.0-windows\GmsSvn.S.A2F7967F.Up2Date
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net8.0-windows\GmsSvn.ShellExtension.dll
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net8.0-windows\refint\GmsSvn.ShellExtension.dll
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net8.0-windows\GmsSvn.ShellExtension.pdb
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net8.0-windows\GmsSvn.ShellExtension.genruntimeconfig.cache
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net8.0-windows\ref\GmsSvn.ShellExtension.dll

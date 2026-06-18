@@ -1,0 +1,14 @@
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\bin\Release\net8.0-windows\GmsSvn.ShellBridge.exe
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\bin\Release\net8.0-windows\GmsSvn.ShellBridge.deps.json
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\bin\Release\net8.0-windows\GmsSvn.ShellBridge.runtimeconfig.json
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\bin\Release\net8.0-windows\GmsSvn.ShellBridge.dll
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\bin\Release\net8.0-windows\GmsSvn.ShellBridge.pdb
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net8.0-windows\GmsSvn.ShellBridge.GeneratedMSBuildEditorConfig.editorconfig
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net8.0-windows\GmsSvn.ShellBridge.AssemblyInfoInputs.cache
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net8.0-windows\GmsSvn.ShellBridge.AssemblyInfo.cs
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net8.0-windows\GmsSvn.ShellBridge.csproj.CoreCompileInputs.cache
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net8.0-windows\GmsSvn.ShellBridge.dll
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net8.0-windows\refint\GmsSvn.ShellBridge.dll
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net8.0-windows\GmsSvn.ShellBridge.pdb
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net8.0-windows\GmsSvn.ShellBridge.genruntimeconfig.cache
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net8.0-windows\ref\GmsSvn.ShellBridge.dll

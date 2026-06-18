@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gms_svn
+          POSTGRES_PASSWORD: gms_svn_dev
+          POSTGRES_DB: gms_svn
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gms_svn -d gms_svn"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://gms_svn:gms_svn_dev@localhost:5432/gms_svn?schema=public
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: |
+          npm run build --workspace=@gms-svn/shared
+          npm run build --workspace=@gms-svn/svn-contracts
+
+      - name: Generate Prisma client
+        run: npm run db:generate --workspace=@gms-svn/api
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      - name: Build web
+        run: npm run build --workspace=@gms-svn/web
+
+      - name: Build API
+        run: npm run build --workspace=@gms-svn/api

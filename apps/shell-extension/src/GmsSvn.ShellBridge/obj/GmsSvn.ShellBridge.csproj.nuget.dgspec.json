@@ -1,0 +1,63 @@
+{
+  "format": 1,
+  "restore": {
+    "D:\\GMS-SVN\\apps\\shell-extension\\src\\GmsSvn.ShellBridge\\GmsSvn.ShellBridge.csproj": {}
+  },
+  "projects": {
+    "D:\\GMS-SVN\\apps\\shell-extension\\src\\GmsSvn.ShellBridge\\GmsSvn.ShellBridge.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\GMS-SVN\\apps\\shell-extension\\src\\GmsSvn.ShellBridge\\GmsSvn.ShellBridge.csproj",
+        "projectName": "GmsSvn.ShellBridge",
+        "projectPath": "D:\\GMS-SVN\\apps\\shell-extension\\src\\GmsSvn.ShellBridge\\GmsSvn.ShellBridge.csproj",
+        "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
+        "outputPath": "D:\\GMS-SVN\\apps\\shell-extension\\src\\GmsSvn.ShellBridge\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Admin\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net48"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net48": {
+            "targetAlias": "net48",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net48": {
+          "targetAlias": "net48",
+          "dependencies": {
+            "Microsoft.NETFramework.ReferenceAssemblies": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[1.0.3, )",
+              "autoReferenced": true
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.422\\RuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "win7-x64": {
+          "#import": []
+        }
+      }
+    }
+  }
+}

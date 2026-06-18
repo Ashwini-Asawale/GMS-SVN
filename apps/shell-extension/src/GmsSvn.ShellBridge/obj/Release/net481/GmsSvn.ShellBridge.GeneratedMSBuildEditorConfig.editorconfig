@@ -1,0 +1,5 @@
+is_global = true
+build_property.RootNamespace = GmsSvn.ShellBridge
+build_property.ProjectDir = D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
