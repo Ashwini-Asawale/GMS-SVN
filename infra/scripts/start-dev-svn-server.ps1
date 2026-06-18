@@ -5,12 +5,20 @@
   Uses TortoiseSVN svnserve.exe — no VisualSVN required.
 #>
 param(
-  [string]$RepoRoot = 'D:\GMS-SVN\.dev-svn-repos',
-  [int]$Port = 3690,
+  [string]$RepoRoot = '',
+  [int]$Port = 0,
   [string[]]$RepoNames = @('Repo', 'My-Repo', 'TestRepo', 'Vinnet-Repo')
 )
 
 $ErrorActionPreference = 'Stop'
+$getEnv = Join-Path $PSScriptRoot 'Get-EnvValue.ps1'
+
+if (-not $RepoRoot) { $RepoRoot = & $getEnv -Name 'VISUALSVN_REPO_ROOT' -Default 'D:\GMS-SVN\.dev-svn-repos' }
+if ($Port -eq 0) {
+  $portText = & $getEnv -Name 'SVN_PORT' -Default '3690'
+  $Port = [int]$portText
+}
+$ServerHost = & $getEnv -Name 'GMS_SVN_SERVER_HOST' -Default '192.168.1.133'
 
 function Find-SvnExe {
   foreach ($p in @(
@@ -105,8 +113,8 @@ if (-not $listening) { throw "svnserve did not start on port $Port" }
 
 Write-Host ''
 Write-Host 'SVN server ready.' -ForegroundColor Green
-Write-Host "  Base URL: svn://192.168.1.133:$Port"
-Write-Host "  Example:  svn://192.168.1.133:$Port/Repo"
+Write-Host "  Base URL: svn://${ServerHost}:$Port"
+Write-Host "  Example:  svn://${ServerHost}:$Port/Repo"
 Write-Host ''
 Write-Host 'Set Web Admin Settings -> VisualSVN URL to:'
-Write-Host "  svn://192.168.1.133:$Port"
+Write-Host "  svn://${ServerHost}:$Port"

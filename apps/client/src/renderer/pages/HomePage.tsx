@@ -2,8 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { SVN_LABELS } from '@gms-svn/shared';
 import type { WorkingCopy } from '../../preload/index';
+import { CheckoutBrowserDialog, type CheckoutBrowserSelection } from '../components/CheckoutBrowserDialog';
 import { api, type ClientRepo } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+
+function joinLocalPath(base: string, segment: string): string {
+  const trimmed = base.replace(/[\\/]+$/, '');
+  return `${trimmed}\\${segment}`;
+}
 
 export function HomePage() {
   const { auth, getAccessToken, logout } = useAuth();
@@ -12,7 +18,12 @@ export function HomePage() {
   const [repos, setRepos] = useState<ClientRepo[]>([]);
   const [workingCopies, setWorkingCopies] = useState<WorkingCopy[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<ClientRepo | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState('');
+  const [checkoutRepoPath, setCheckoutRepoPath] = useState('/');
+  const [checkoutFolderName, setCheckoutFolderName] = useState('');
+  const [showBrowser, setShowBrowser] = useState(false);
   const [localPath, setLocalPath] = useState('');
+  const [checkoutToFolderName, setCheckoutToFolderName] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [svnPath, setSvnPath] = useState('');
@@ -66,21 +77,50 @@ export function HomePage() {
     }
   }, [searchParams, workingCopies, navigate]);
 
+  useEffect(() => {
+    if (!selectedRepo?.svnUrl) {
+      setCheckoutUrl('');
+      setCheckoutRepoPath('/');
+      setCheckoutFolderName('');
+      return;
+    }
+    const root = selectedRepo.svnUrl.replace(/\/+$/, '');
+    setCheckoutUrl(root);
+    setCheckoutRepoPath('/');
+    setCheckoutFolderName(selectedRepo.name);
+  }, [selectedRepo]);
+
   const pickFolder = async () => {
     const folder = await window.gmsClient.system.selectFolder();
     if (folder) setLocalPath(folder);
   };
 
+  const handleBrowserSelect = (selection: CheckoutBrowserSelection) => {
+    setCheckoutUrl(selection.url);
+    setCheckoutRepoPath(selection.path);
+    setCheckoutFolderName(selection.folderName);
+    setShowBrowser(false);
+  };
+
+  const resolveCheckoutTargetPath = (): string => {
+    if (!localPath.trim()) return '';
+    if (!checkoutToFolderName) return localPath.trim();
+    if (checkoutRepoPath === '/') return localPath.trim();
+    return joinLocalPath(localPath.trim(), checkoutFolderName);
+  };
+
   const checkout = async () => {
-    if (!selectedRepo?.svnUrl || !localPath) return;
+    const targetPath = resolveCheckoutTargetPath();
+    if (!checkoutUrl || !targetPath || !selectedRepo) return;
+
     setBusy(true);
     setError(null);
     try {
       const token = await getAccessToken();
       if (!token) return;
       const result = await window.gmsClient.svn.checkout({
-        url: selectedRepo.svnUrl,
-        localPath,
+        url: checkoutUrl,
+        localPath: targetPath,
         repositoryName: selectedRepo.name,
         accessToken: token,
       });
@@ -88,6 +128,9 @@ export function HomePage() {
       await load();
       setSelectedRepo(null);
       setLocalPath('');
+      setCheckoutUrl('');
+      setCheckoutRepoPath('/');
+      setCheckoutFolderName('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Checkout failed');
     } finally {
@@ -99,6 +142,8 @@ export function HomePage() {
     await window.gmsClient.workingCopies.remove(id);
     await load();
   };
+
+  const checkoutTargetPreview = resolveCheckoutTargetPath();
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -166,9 +211,11 @@ export function HomePage() {
 
       <section className="rounded-lg border border-slate-800 p-4">
         <h2 className="font-semibold">{SVN_LABELS.checkout}</h2>
-        <p className="text-sm text-slate-400 mt-1">Repositories you can access (VisualSVN enforces permissions on commit)</p>
+        <p className="text-sm text-slate-400 mt-1">
+          Select repository URL with Browse (like TortoiseSVN Repository Browser), then choose local folder.
+        </p>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3">
           <label className="text-sm">
             <span className="text-slate-400">Repository</span>
             <select
@@ -179,13 +226,34 @@ export function HomePage() {
               <option value="">Select…</option>
               {repos.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name} {r.svnUrl ? `(${r.svnUrl})` : ''}
+                  {r.name}
                 </option>
               ))}
             </select>
           </label>
+
           <label className="text-sm">
-            <span className="text-slate-400">Local folder</span>
+            <span className="text-slate-400">URL of repository</span>
+            <div className="mt-1 flex gap-2">
+              <input
+                readOnly
+                value={checkoutUrl}
+                className="flex-1 rounded border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-blue-200"
+                placeholder="svn://server:3690/Repo/branches/my-branch"
+              />
+              <button
+                type="button"
+                onClick={() => setShowBrowser(true)}
+                disabled={!selectedRepo?.svnUrl}
+                className="rounded border border-slate-600 px-4 text-sm disabled:opacity-50"
+              >
+                Browse…
+              </button>
+            </div>
+          </label>
+
+          <label className="text-sm">
+            <span className="text-slate-400">Checkout directory</span>
             <div className="mt-1 flex gap-2">
               <input
                 value={localPath}
@@ -194,23 +262,56 @@ export function HomePage() {
                 placeholder="C:\Projects\my-repo"
               />
               <button type="button" onClick={pickFolder} className="rounded border border-slate-600 px-3 text-sm">
-                Browse
+                Browse…
               </button>
             </div>
           </label>
         </div>
+
+        <label className="mt-3 flex items-center gap-2 text-sm text-slate-300">
+          <input
+            type="checkbox"
+            checked={checkoutToFolderName}
+            onChange={(e) => setCheckoutToFolderName(e.target.checked)}
+            className="rounded border-slate-600"
+          />
+          Checkout to folder name (create subfolder for selected path)
+        </label>
+
+        {checkoutRepoPath !== '/' && (
+          <p className="mt-2 text-xs text-slate-500">
+            Selected path: <span className="font-mono text-slate-400">{checkoutRepoPath}</span>
+          </p>
+        )}
+        {checkoutTargetPreview && checkoutTargetPreview !== localPath.trim() && (
+          <p className="mt-1 text-xs text-slate-500 font-mono break-all">
+            Local target: {checkoutTargetPreview}
+          </p>
+        )}
 
         {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
 
         <button
           type="button"
           onClick={checkout}
-          disabled={busy || !selectedRepo?.svnUrl || !localPath}
+          disabled={busy || !selectedRepo?.svnUrl || !localPath || !checkoutUrl}
           className="mt-4 rounded bg-blue-600 px-4 py-2 text-sm disabled:opacity-50"
         >
           {busy ? 'Checking out…' : SVN_LABELS.checkout}
         </button>
       </section>
+
+      {showBrowser && selectedRepo?.svnUrl && (
+        <CheckoutBrowserDialog
+          repositoryId={selectedRepo.id}
+          repoName={selectedRepo.name}
+          repoRootUrl={selectedRepo.svnUrl.replace(/\/+$/, '')}
+          initialPath={checkoutRepoPath}
+          onSelect={handleBrowserSelect}
+          onClose={() => setShowBrowser(false)}
+          getAccessToken={getAccessToken}
+        />
+      )}
     </div>
   );
 }

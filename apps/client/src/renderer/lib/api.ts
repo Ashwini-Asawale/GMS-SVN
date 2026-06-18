@@ -17,6 +17,25 @@ export interface ClientRepo {
   sizeBytes: string | null;
 }
 
+export interface ClientCheckoutPath {
+  label: string;
+  path: string;
+  url: string;
+  folderName: string;
+}
+
+export interface ClientRepoBrowseEntry {
+  name: string;
+  kind: 'dir' | 'file';
+}
+
+export interface ClientRepoBrowseResult {
+  repositoryName: string;
+  path: string;
+  url: string;
+  entries: ClientRepoBrowseEntry[];
+}
+
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
@@ -72,6 +91,21 @@ export const api = {
 
   clientRepos(accessToken: string) {
     return request<ClientRepo[]>('/client/repos', accessToken);
+  },
+
+  clientCheckoutPaths(accessToken: string, repositoryId: string) {
+    return request<{ paths: ClientCheckoutPath[] }>(
+      `/client/repos/${repositoryId}/checkout-paths`,
+      accessToken,
+    );
+  },
+
+  clientBrowseRepository(accessToken: string, repositoryId: string, path = '/') {
+    const query = new URLSearchParams({ path });
+    return request<ClientRepoBrowseResult>(
+      `/client/repos/${repositoryId}/browse?${query.toString()}`,
+      accessToken,
+    );
   },
 
   postAudit(

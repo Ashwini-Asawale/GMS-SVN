@@ -4,13 +4,27 @@
   Apply GMS platform settings for dev testing (API + svnserve on this PC).
 #>
 param(
-  [string]$ServerHost = '192.168.1.133',
-  [string]$ApiBaseUrl = 'http://192.168.1.133:3001',
-  [string]$SvnBaseUrl = 'svn://192.168.1.133:3690',
-  [string]$RepoRoot = 'D:\GMS-SVN\.dev-svn-repos'
+  [string]$ServerHost = '',
+  [string]$ApiBaseUrl = '',
+  [string]$SvnBaseUrl = '',
+  [string]$RepoRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
+$getEnv = Join-Path $PSScriptRoot 'Get-EnvValue.ps1'
+
+if (-not $ServerHost) { $ServerHost = & $getEnv -Name 'GMS_SVN_SERVER_HOST' -Default '192.168.1.133' }
+if (-not $RepoRoot) { $RepoRoot = & $getEnv -Name 'VISUALSVN_REPO_ROOT' -Default 'D:\GMS-SVN\.dev-svn-repos' }
+$svnPort = & $getEnv -Name 'SVN_PORT' -Default '3690'
+if (-not $SvnBaseUrl) {
+  $fromEnv = & $getEnv -Name 'VISUALSVN_URL' -Default ''
+  $SvnBaseUrl = if ($fromEnv) { $fromEnv } else { "svn://${ServerHost}:$svnPort" }
+}
+if (-not $ApiBaseUrl) {
+  $apiPort = & $getEnv -Name 'API_PORT' -Default '3001'
+  $ApiBaseUrl = "http://${ServerHost}:$apiPort"
+}
+
 $repoRoot = $RepoRoot
 
 Push-Location (Join-Path $PSScriptRoot '..\..\apps\api')

@@ -7,9 +7,13 @@ import { ensureDefaultTenant } from '../src/lib/tenant.js';
 
 ensureDatabaseUrl();
 
-const serverHost = process.argv[2] ?? '192.168.1.133';
-const svnUrl = process.argv[3] ?? 'svn://192.168.1.133:3690';
-const repoRoot = process.argv[4] ?? 'D:\\GMS-SVN\\.dev-svn-repos';
+const serverHost = process.argv[2] ?? process.env.GMS_SVN_SERVER_HOST ?? '192.168.1.133';
+const svnPort = process.env.SVN_PORT ?? '3690';
+const svnUrl =
+  process.argv[3] ??
+  process.env.VISUALSVN_URL ??
+  `svn://${serverHost}:${svnPort}`;
+const repoRoot = process.argv[4] ?? process.env.VISUALSVN_REPO_ROOT ?? 'D:\\GMS-SVN\\.dev-svn-repos';
 
 async function main() {
   const tenant = await ensureDefaultTenant();

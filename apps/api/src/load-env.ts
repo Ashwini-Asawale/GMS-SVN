@@ -7,8 +7,8 @@ const apiRoot = path.resolve(currentDir, '..');
 const repoRoot = path.resolve(apiRoot, '../..');
 
 // Monorepo: .env at repo root (primary), optional apps/api/.env override
-dotenv.config({ path: path.join(repoRoot, '.env') });
-dotenv.config({ path: path.join(apiRoot, '.env') });
+dotenv.config({ path: path.join(repoRoot, '.env'), override: true });
+dotenv.config({ path: path.join(apiRoot, '.env'), override: true });
 
 export function ensureDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;

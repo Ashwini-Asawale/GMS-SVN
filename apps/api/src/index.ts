@@ -62,7 +62,7 @@ async function main() {
   await app.register(dashboardRoutes);
   await app.register(settingsRoutes);
   await app.register(agentRoutes, config);
-  await app.register(clientRoutes);
+  await app.register(clientRoutes, config);
   await app.register(auditRoutes);
   await app.register(reportRoutes, config);
   await app.register(collaborationRoutes);
