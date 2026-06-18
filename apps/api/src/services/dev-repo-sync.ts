@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { prisma } from '../lib/prisma.js';
 import { getPlatformSettings } from '../lib/platform-settings.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -15,11 +16,13 @@ function isSvnRepository(dirPath: string): boolean {
  * Register SVN repositories found on disk into the platform DB (dev + LAN svnserve).
  */
 export async function syncDevRepositoriesFromDisk(options?: {
+  tenantId?: string;
   repoRoot?: string;
   svnUrl?: string;
   grantDevelopersAccess?: boolean;
 }): Promise<{ synced: number; names: string[] }> {
-  const settings = await getPlatformSettings();
+  const tenantId = options?.tenantId ?? DEFAULT_TENANT_ID;
+  const settings = await getPlatformSettings(tenantId);
   const repoRoot = options?.repoRoot ?? settings.visualsvnRepoRoot;
   const svnUrl = (options?.svnUrl ?? settings.visualsvnUrl).replace(/\/+$/, '');
   const grantDevelopersAccess = options?.grantDevelopersAccess ?? true;
@@ -36,8 +39,9 @@ export async function syncDevRepositoriesFromDisk(options?: {
 
   for (const name of names) {
     const repository = await prisma.repository.upsert({
-      where: { name },
+      where: { tenantId_name: { tenantId, name } },
       create: {
+        tenantId,
         name,
         slug: slugify(name),
         status: 'ACTIVE',
@@ -72,4 +76,18 @@ export async function syncDevRepositoriesFromDisk(options?: {
   }
 
   return { synced: names.length, names };
+}
+
+export async function syncAllTenantsFromDisk() {
+  const tenants = await prisma.tenant.findMany({ where: { isActive: true }, select: { id: true } });
+  let synced = 0;
+  const names: string[] = [];
+
+  for (const tenant of tenants) {
+    const result = await syncDevRepositoriesFromDisk({ tenantId: tenant.id });
+    synced += result.synced;
+    names.push(...result.names);
+  }
+
+  return { synced, names: [...new Set(names)] };
 }

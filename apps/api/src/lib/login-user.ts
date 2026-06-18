@@ -2,6 +2,7 @@ import type { User } from '@prisma/client';
 import { prisma } from './prisma.js';
 
 export async function findUserByLoginIdentifier(
+  tenantId: string,
   email?: string,
   username?: string,
 ): Promise<User | null> {
@@ -10,9 +11,17 @@ export async function findUserByLoginIdentifier(
 
   if (identifier.includes('@')) {
     return prisma.user.findFirst({
-      where: { email: { equals: identifier, mode: 'insensitive' } },
+      where: {
+        tenantId,
+        email: { equals: identifier, mode: 'insensitive' },
+      },
     });
   }
 
-  return prisma.user.findUnique({ where: { username: identifier } });
+  return prisma.user.findFirst({
+    where: {
+      tenantId,
+      username: identifier,
+    },
+  });
 }

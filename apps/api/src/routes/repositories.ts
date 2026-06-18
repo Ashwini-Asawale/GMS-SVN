@@ -22,18 +22,21 @@ import {
   createRepositoryBranch,
 } from '../services/repository-service.js';
 import type { AppConfig } from '../config.js';
+import { tenantIdFromRequest } from '../lib/tenant.js';
 
 export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) {
   app.addHook('preHandler', authenticate);
 
-  app.get('/repositories', async () => {
-    const repos = await prisma.repository.findMany({ orderBy: { name: 'asc' } });
+  app.get('/repositories', async (request) => {
+    const tenantId = tenantIdFromRequest(request);
+    const repos = await prisma.repository.findMany({ where: { tenantId }, orderBy: { name: 'asc' } });
     return repos.map(serializeRepository);
   });
 
   app.get('/repositories/:id', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id } = request.params as { id: string };
-    const repo = await getRepository(id);
+    const repo = await getRepository(tenantId, id);
     if (!repo) return reply.status(404).send({ error: 'Repository not found' });
     return repo;
   });
@@ -46,7 +49,9 @@ export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) 
 
     try {
       const orchestrator = getAgentOrchestrator(config);
+      const tenantId = tenantIdFromRequest(request);
       const { repository, command } = await orchestrator.createRepository(
+        tenantId,
         parsed.data.name,
         request.user!.sub,
       );
@@ -73,7 +78,8 @@ export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) 
     }
 
     try {
-      const updated = await updateRepository(config, id, parsed.data, request.user!.sub);
+      const tenantId = tenantIdFromRequest(request);
+      const updated = await updateRepository(config, tenantId, id, parsed.data, request.user!.sub);
       return updated;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Update failed';
@@ -84,7 +90,8 @@ export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) 
   app.post('/repositories/:id/refresh', { preHandler: [requireAdmin] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     try {
-      return await refreshRepositoryStatus(config, id, request.user!.sub);
+      const tenantId = tenantIdFromRequest(request);
+      return await refreshRepositoryStatus(config, tenantId, id, request.user!.sub);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Refresh failed';
       return reply.status(400).send({ error: message });
@@ -92,8 +99,9 @@ export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) 
   });
 
   app.get('/repositories/:id/access-rules', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id } = request.params as { id: string };
-    const repo = await prisma.repository.findUnique({ where: { id } });
+    const repo = await prisma.repository.findFirst({ where: { id, tenantId } });
     if (!repo) return reply.status(404).send({ error: 'Repository not found' });
 
     return prisma.repoAccessRule.findMany({
@@ -110,7 +118,8 @@ export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) 
     }
 
     try {
-      const rule = await addAccessRule(config, id, parsed.data, request.user!.sub);
+      const tenantId = tenantIdFromRequest(request);
+      const rule = await addAccessRule(config, tenantId, id, parsed.data, request.user!.sub);
       return reply.status(201).send(rule);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save access rule';
@@ -124,7 +133,8 @@ export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) 
     async (request, reply) => {
       const { id, ruleId } = request.params as { id: string; ruleId: string };
       try {
-        await removeAccessRule(config, id, ruleId, request.user!.sub);
+        const tenantId = tenantIdFromRequest(request);
+        await removeAccessRule(config, tenantId, id, ruleId, request.user!.sub);
         return reply.status(204).send();
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to remove access rule';
@@ -137,7 +147,8 @@ export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) 
     const { id } = request.params as { id: string };
     const path = (request.query as { path?: string }).path ?? '/';
     try {
-      return await browseRepository(config, id, path, request.user!.sub);
+      const tenantId = tenantIdFromRequest(request);
+      return await browseRepository(config, tenantId, id, path, request.user!.sub);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Browse failed';
       return reply.status(400).send({ error: message });
@@ -150,7 +161,8 @@ export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) 
     const path = q.path ?? '/trunk';
     const limit = Math.min(200, Math.max(1, Number(q.limit ?? 50)));
     try {
-      return await getRepositoryLog(config, id, path, limit, request.user!.sub);
+      const tenantId = tenantIdFromRequest(request);
+      return await getRepositoryLog(config, tenantId, id, path, limit, request.user!.sub);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Log failed';
       return reply.status(400).send({ error: message });
@@ -166,7 +178,8 @@ export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) 
       return reply.status(400).send({ error: 'Invalid revision' });
     }
     try {
-      return await getRepositoryDiff(config, id, path, revision, request.user!.sub);
+      const tenantId = tenantIdFromRequest(request);
+      return await getRepositoryDiff(config, tenantId, id, path, revision, request.user!.sub);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Diff failed';
       return reply.status(400).send({ error: message });
@@ -176,7 +189,8 @@ export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) 
   app.get('/repositories/:id/branches', async (request, reply) => {
     const { id } = request.params as { id: string };
     try {
-      return await listRepositoryBranches(config, id, request.user!.sub);
+      const tenantId = tenantIdFromRequest(request);
+      return await listRepositoryBranches(config, tenantId, id, request.user!.sub);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to list branches';
       return reply.status(400).send({ error: message });
@@ -191,7 +205,8 @@ export async function repositoryRoutes(app: FastifyInstance, config: AppConfig) 
     }
 
     try {
-      const result = await createRepositoryBranch(config, id, parsed.data, request.user!.sub);
+      const tenantId = tenantIdFromRequest(request);
+      const result = await createRepositoryBranch(config, tenantId, id, parsed.data, request.user!.sub);
       return reply.status(201).send(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create branch';

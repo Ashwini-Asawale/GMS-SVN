@@ -17,6 +17,7 @@ import {
   verifyPipelineSignature,
 } from '../services/pipeline-service.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { tenantIdFromRequest } from '../lib/tenant.js';
 
 export async function hookRoutes(app: FastifyInstance, config: AppConfig) {
   app.post('/hooks/post-commit', async (request, reply) => {
@@ -146,7 +147,8 @@ export async function pipelineRoutes(app: FastifyInstance, config: AppConfig) {
       const body = request.body as { revision?: number; changedPaths?: string[] };
       const revision = body.revision ?? 1;
 
-      const repo = await prisma.repository.findUniqueOrThrow({ where: { id } });
+      const tenantId = tenantIdFromRequest(request);
+      const repo = await prisma.repository.findFirstOrThrow({ where: { id, tenantId } });
       try {
         const result = await handlePostCommit(config, {
           repositoryName: repo.name,

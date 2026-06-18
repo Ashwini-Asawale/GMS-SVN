@@ -42,9 +42,9 @@ export function serializeRepository(r: {
   };
 }
 
-export async function getRepository(id: string) {
-  const repo = await prisma.repository.findUnique({
-    where: { id },
+export async function getRepository(tenantId: string, id: string) {
+  const repo = await prisma.repository.findFirst({
+    where: { id, tenantId },
     include: { accessRules: { orderBy: [{ path: 'asc' }, { principalName: 'asc' }] } },
   });
   if (!repo) return null;
@@ -56,20 +56,25 @@ export async function getRepository(id: string) {
 
 export async function updateRepository(
   _config: AppConfig,
+  tenantId: string,
   id: string,
   data: { name?: string; status?: 'ACTIVE' | 'ARCHIVED' },
   userId: string,
 ) {
-  const repo = await prisma.repository.findUnique({ where: { id } });
+  const repo = await prisma.repository.findFirst({ where: { id, tenantId } });
   if (!repo) throw new Error('Repository not found');
 
   if (data.name && data.name !== repo.name) {
     const taken = await prisma.repository.findFirst({
-      where: { OR: [{ name: data.name }, { slug: slugify(data.name) }], NOT: { id } },
+      where: {
+        tenantId,
+        OR: [{ name: data.name }, { slug: slugify(data.name) }],
+        NOT: { id },
+      },
     });
     if (taken) throw new Error('Repository name already exists');
 
-    const settings = await getPlatformSettings();
+    const settings = await getPlatformSettings(tenantId);
     const updated = await prisma.repository.update({
       where: { id },
       data: {
@@ -83,6 +88,7 @@ export async function updateRepository(
 
     await writeAuditLog({
       action: 'repo.updated',
+      tenantId,
       userId,
       repositoryId: id,
       metadata: { previousName: repo.name, name: data.name },
@@ -98,6 +104,7 @@ export async function updateRepository(
     });
     await writeAuditLog({
       action: 'repo.archived',
+      tenantId,
       userId,
       repositoryId: id,
       metadata: { name: repo.name },
@@ -110,6 +117,7 @@ export async function updateRepository(
 
 export async function addAccessRule(
   config: AppConfig,
+  tenantId: string,
   repositoryId: string,
   input: {
     path: string;
@@ -119,7 +127,7 @@ export async function addAccessRule(
   },
   userId: string,
 ) {
-  const repo = await prisma.repository.findUnique({ where: { id: repositoryId } });
+  const repo = await prisma.repository.findFirst({ where: { id: repositoryId, tenantId } });
   if (!repo || repo.status === 'ARCHIVED') throw new Error('Repository not available');
 
   const orchestrator = getAgentOrchestrator(config);
@@ -150,6 +158,7 @@ export async function addAccessRule(
 
   await writeAuditLog({
     action: 'access_rule.created',
+    tenantId,
     userId,
     repositoryId,
     metadata: { ruleId: rule.id, ...input },
@@ -160,16 +169,17 @@ export async function addAccessRule(
 
 export async function removeAccessRule(
   config: AppConfig,
+  tenantId: string,
   repositoryId: string,
   ruleId: string,
   userId: string,
 ) {
   const rule = await prisma.repoAccessRule.findFirst({
-    where: { id: ruleId, repositoryId },
+    where: { id: ruleId, repositoryId, repository: { tenantId } },
   });
   if (!rule) throw new Error('Access rule not found');
 
-  const repo = await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } });
+  const repo = await prisma.repository.findFirstOrThrow({ where: { id: repositoryId, tenantId } });
 
   const orchestrator = getAgentOrchestrator(config);
   await orchestrator.executeQuery(
@@ -187,6 +197,7 @@ export async function removeAccessRule(
 
   await writeAuditLog({
     action: 'access_rule.removed',
+    tenantId,
     userId,
     repositoryId,
     metadata: { ruleId, path: rule.path, principalName: rule.principalName },
@@ -195,11 +206,12 @@ export async function removeAccessRule(
 
 export async function browseRepository(
   config: AppConfig,
+  tenantId: string,
   repositoryId: string,
   path: string,
   userId: string,
 ) {
-  const repo = await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } });
+  const repo = await prisma.repository.findFirstOrThrow({ where: { id: repositoryId, tenantId } });
   const orchestrator = getAgentOrchestrator(config);
   const data = await orchestrator.executeQuery(
     'ListPath',
@@ -211,22 +223,26 @@ export async function browseRepository(
 
 export async function getRepositoryLog(
   config: AppConfig,
+  tenantId: string,
   repositoryId: string,
   path: string,
   limit: number,
   userId: string,
 ) {
-  const repo = await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } });
+  const repo = await prisma.repository.findFirstOrThrow({ where: { id: repositoryId, tenantId } });
   const orchestrator = getAgentOrchestrator(config);
   const data = await orchestrator.executeQuery(
     'GetLog',
     { repositoryName: repo.name, path, limit },
-    { repositoryId, requestedById: userId },
+    { repositoryId, requestedById: userId, tenantId },
   );
-  return enrichRepositoryLogAuthors(data);
+  return enrichRepositoryLogAuthors(tenantId, data);
 }
 
-async function enrichRepositoryLogAuthors(data: Record<string, unknown>): Promise<Record<string, unknown>> {
+async function enrichRepositoryLogAuthors(
+  tenantId: string,
+  data: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
   const entries = (data.entries as {
     revision: number;
     author: string;
@@ -243,7 +259,7 @@ async function enrichRepositoryLogAuthors(data: Record<string, unknown>): Promis
   const users =
     authorNames.length > 0
       ? await prisma.user.findMany({
-          where: { username: { in: authorNames } },
+          where: { tenantId, username: { in: authorNames } },
           select: { username: true, email: true },
         })
       : [];
@@ -270,12 +286,13 @@ async function enrichRepositoryLogAuthors(data: Record<string, unknown>): Promis
 
 export async function getRepositoryDiff(
   config: AppConfig,
+  tenantId: string,
   repositoryId: string,
   path: string,
   revision: number,
   userId: string,
 ) {
-  const repo = await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } });
+  const repo = await prisma.repository.findFirstOrThrow({ where: { id: repositoryId, tenantId } });
   const orchestrator = getAgentOrchestrator(config);
   const data = await orchestrator.executeQuery(
     'GetDiff',
@@ -287,10 +304,11 @@ export async function getRepositoryDiff(
 
 export async function refreshRepositoryStatus(
   config: AppConfig,
+  tenantId: string,
   repositoryId: string,
   userId?: string,
 ) {
-  const repo = await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } });
+  const repo = await prisma.repository.findFirstOrThrow({ where: { id: repositoryId, tenantId } });
   const orchestrator = getAgentOrchestrator(config);
   const data = await orchestrator.executeQuery(
     'GetRepositoryStatus',
@@ -314,8 +332,8 @@ export async function refreshRepositoryStatus(
   return serializeRepository(updated);
 }
 
-async function getSvnDirectSettings(): Promise<SvnDirectSettings> {
-  const platform = await getPlatformSettings();
+async function getSvnDirectSettings(tenantId: string): Promise<SvnDirectSettings> {
+  const platform = await getPlatformSettings(tenantId);
   return {
     visualsvnUrl: platform.visualsvnUrl,
     visualsvnRepoRoot: platform.visualsvnRepoRoot,
@@ -324,11 +342,12 @@ async function getSvnDirectSettings(): Promise<SvnDirectSettings> {
 
 export async function listRepositoryBranches(
   config: AppConfig,
+  tenantId: string,
   repositoryId: string,
   userId: string,
 ) {
-  const repo = await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } });
-  const svnSettings = await getSvnDirectSettings();
+  const repo = await prisma.repository.findFirstOrThrow({ where: { id: repositoryId, tenantId } });
+  const svnSettings = await getSvnDirectSettings(tenantId);
 
   if (config.agentMock && svnDirectAvailable(svnSettings)) {
     try {
@@ -347,7 +366,7 @@ export async function listRepositoryBranches(
     }
   }
 
-  const data = await browseRepository(config, repositoryId, '/branches', userId);
+  const data = await browseRepository(config, tenantId, repositoryId, '/branches', userId);
   const entries = (data.entries as { name: string; kind: string }[]) ?? [];
   const repoUrl = repo.svnUrl ?? `${svnSettings.visualsvnUrl.replace(/\/+$/, '')}/${repo.name}`;
   return {
@@ -363,16 +382,17 @@ export async function listRepositoryBranches(
 
 export async function createRepositoryBranch(
   config: AppConfig,
+  tenantId: string,
   repositoryId: string,
   input: { name: string; sourcePath?: string; message: string },
   userId: string,
 ) {
-  const repo = await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } });
+  const repo = await prisma.repository.findFirstOrThrow({ where: { id: repositoryId, tenantId } });
   if (repo.status !== 'ACTIVE') {
     throw new Error('Repository is not active');
   }
 
-  const svnSettings = await getSvnDirectSettings();
+  const svnSettings = await getSvnDirectSettings(tenantId);
   if (!svnDirectAvailable(svnSettings)) {
     throw new Error('SVN server is not configured or svn executable is missing.');
   }
@@ -387,6 +407,7 @@ export async function createRepositoryBranch(
 
   await writeAuditLog({
     action: 'repo.updated',
+    tenantId,
     userId,
     repositoryId,
     metadata: {
@@ -408,7 +429,7 @@ export async function createRepositoryBranch(
       },
     });
   } else {
-    await refreshRepositoryStatus(config, repositoryId, userId);
+    await refreshRepositoryStatus(config, tenantId, repositoryId, userId);
   }
 
   return result;

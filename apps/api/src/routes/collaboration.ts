@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { authenticate } from '../middleware/auth.js';
+import { tenantIdFromRequest } from '../lib/tenant.js';
 import {
   createIssueSchema,
   createReviewRequestSchema,
@@ -25,9 +26,10 @@ export async function collaborationRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate);
 
   app.get('/repositories/:id/issues', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id } = request.params as { id: string };
     try {
-      return await listIssues(id);
+      return await listIssues(tenantId, id);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to list issues';
       return reply.status(400).send({ error: message });
@@ -35,12 +37,13 @@ export async function collaborationRoutes(app: FastifyInstance) {
   });
 
   app.post('/repositories/:id/issues', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id } = request.params as { id: string };
     const parsed = createIssueSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     try {
-      return reply.status(201).send(await createIssue(id, request.user!.sub, parsed.data));
+      return reply.status(201).send(await createIssue(tenantId, id, request.user!.sub, parsed.data));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create issue';
       return reply.status(400).send({ error: message });
@@ -48,12 +51,13 @@ export async function collaborationRoutes(app: FastifyInstance) {
   });
 
   app.patch('/repositories/:id/issues/:issueId', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id, issueId } = request.params as { id: string; issueId: string };
     const parsed = updateIssueSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     try {
-      return await updateIssue(id, issueId, request.user!.sub, parsed.data);
+      return await updateIssue(tenantId, id, issueId, request.user!.sub, parsed.data);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update issue';
       return reply.status(400).send({ error: message });
@@ -61,9 +65,10 @@ export async function collaborationRoutes(app: FastifyInstance) {
   });
 
   app.get('/repositories/:id/wiki', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id } = request.params as { id: string };
     try {
-      return await listWikiPages(id);
+      return await listWikiPages(tenantId, id);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to list wiki pages';
       return reply.status(400).send({ error: message });
@@ -71,9 +76,10 @@ export async function collaborationRoutes(app: FastifyInstance) {
   });
 
   app.get('/repositories/:id/wiki/:slug', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id, slug } = request.params as { id: string; slug: string };
     try {
-      return await getWikiPage(id, slug);
+      return await getWikiPage(tenantId, id, slug);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Wiki page not found';
       return reply.status(404).send({ error: message });
@@ -81,12 +87,13 @@ export async function collaborationRoutes(app: FastifyInstance) {
   });
 
   app.post('/repositories/:id/wiki', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id } = request.params as { id: string };
     const parsed = createWikiPageSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     try {
-      return reply.status(201).send(await createWikiPage(id, request.user!.sub, parsed.data));
+      return reply.status(201).send(await createWikiPage(tenantId, id, request.user!.sub, parsed.data));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create wiki page';
       return reply.status(400).send({ error: message });
@@ -94,12 +101,13 @@ export async function collaborationRoutes(app: FastifyInstance) {
   });
 
   app.patch('/repositories/:id/wiki/:slug', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id, slug } = request.params as { id: string; slug: string };
     const parsed = updateWikiPageSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     try {
-      return await updateWikiPage(id, slug, request.user!.sub, parsed.data);
+      return await updateWikiPage(tenantId, id, slug, request.user!.sub, parsed.data);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update wiki page';
       return reply.status(400).send({ error: message });
@@ -107,9 +115,10 @@ export async function collaborationRoutes(app: FastifyInstance) {
   });
 
   app.get('/repositories/:id/reviews', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id } = request.params as { id: string };
     try {
-      return await listReviewRequests(id);
+      return await listReviewRequests(tenantId, id);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to list reviews';
       return reply.status(400).send({ error: message });
@@ -117,12 +126,13 @@ export async function collaborationRoutes(app: FastifyInstance) {
   });
 
   app.post('/repositories/:id/reviews', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id } = request.params as { id: string };
     const parsed = createReviewRequestSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     try {
-      return reply.status(201).send(await createReviewRequest(id, request.user!.sub, parsed.data));
+      return reply.status(201).send(await createReviewRequest(tenantId, id, request.user!.sub, parsed.data));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create review request';
       return reply.status(400).send({ error: message });
@@ -130,12 +140,14 @@ export async function collaborationRoutes(app: FastifyInstance) {
   });
 
   app.post('/repositories/:id/reviews/:reviewId/decision', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id, reviewId } = request.params as { id: string; reviewId: string };
     const parsed = reviewDecisionSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     try {
       return await decideReviewRequest(
+        tenantId,
         id,
         reviewId,
         request.user!.sub,

@@ -58,9 +58,10 @@ export async function agentRoutes(app: FastifyInstance, config: AppConfig) {
       return command;
     });
 
-    admin.post('/agent/sync', async (_request, reply) => {
+    admin.post('/agent/sync', async (request, reply) => {
       try {
-        return await triggerRepoSync(config, { wait: true });
+        const tenantId = request.user!.tenantId;
+        return await triggerRepoSync(config, { wait: true, tenantId });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Repository sync failed';
         return reply.status(400).send({ error: message });

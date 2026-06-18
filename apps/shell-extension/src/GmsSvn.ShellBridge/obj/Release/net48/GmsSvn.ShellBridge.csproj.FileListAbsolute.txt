@@ -8,3 +8,4 @@ D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net48\GmsSvn.
 D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net48\GmsSvn.ShellBridge.csproj.CoreCompileInputs.cache
 D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net48\GmsSvn.ShellBridge.exe
 D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net48\GmsSvn.ShellBridge.pdb
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellBridge\obj\Release\net48\GmsSvn.ShellBridge.sourcelink.json

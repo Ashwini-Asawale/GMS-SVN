@@ -63,10 +63,10 @@ async function request<T>(path: string, accessToken: string | null, options: Req
 }
 
 export const api = {
-  login(email: string, password: string) {
+  login(tenantSlug: string, email: string, password: string) {
     return request<LoginResponse>('/auth/login', null, {
       method: 'POST',
-      body: JSON.stringify({ email, username: email, password }),
+      body: JSON.stringify({ tenantSlug, email, username: email, password }),
     });
   },
 

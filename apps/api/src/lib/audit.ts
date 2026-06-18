@@ -4,6 +4,7 @@ import { prisma } from './prisma.js';
 
 interface AuditParams {
   action: AuditAction;
+  tenantId?: string;
   userId?: string;
   repositoryId?: string;
   metadata?: Record<string, unknown>;
@@ -15,6 +16,7 @@ export async function writeAuditLog(params: AuditParams) {
   return prisma.auditLog.create({
     data: {
       action: params.action,
+      tenantId: params.tenantId,
       userId: params.userId,
       repositoryId: params.repositoryId,
       metadata: (params.metadata ?? undefined) as Prisma.InputJsonValue | undefined,

@@ -3,6 +3,7 @@ import type { AuditAction } from '@gms-svn/shared';
 import { prisma } from '../lib/prisma.js';
 
 export interface AuditLogQuery {
+  tenantId: string;
   userId?: string;
   action?: AuditAction;
   repositoryId?: string;
@@ -32,7 +33,7 @@ function metadataRepositoryName(metadata: Prisma.JsonValue | null): string | nul
 }
 
 function buildWhere(query: AuditLogQuery): Prisma.AuditLogWhereInput {
-  const where: Prisma.AuditLogWhereInput = {};
+  const where: Prisma.AuditLogWhereInput = { tenantId: query.tenantId };
 
   if (query.userId) where.userId = query.userId;
   if (query.action) where.action = query.action;

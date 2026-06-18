@@ -9,3 +9,4 @@ D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net48\GmsS
 D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net48\GmsSvn.S.A2F7967F.Up2Date
 D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net48\GmsSvn.ShellExtension.dll
 D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net48\GmsSvn.ShellExtension.pdb
+D:\GMS-SVN\apps\shell-extension\src\GmsSvn.ShellExtension\obj\Release\net48\GmsSvn.ShellExtension.sourcelink.json

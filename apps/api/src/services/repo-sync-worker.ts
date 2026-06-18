@@ -44,10 +44,10 @@ export function startRepoSyncWorker(config: AppConfig) {
   console.info(`[repo-sync] BullMQ worker started (${interval} + on startup)`);
 }
 
-export async function triggerRepoSync(config: AppConfig, options?: { wait?: boolean }) {
+export async function triggerRepoSync(config: AppConfig, options?: { wait?: boolean; tenantId?: string }) {
   const orchestrator = getAgentOrchestrator(config);
   if (options?.wait || !queue) {
-    return orchestrator.syncRepositories();
+    return orchestrator.syncRepositories(undefined, options?.tenantId);
   }
   await queue.add('sync-manual', {}, { jobId: `sync-manual-${Date.now()}` });
   return { queued: true };

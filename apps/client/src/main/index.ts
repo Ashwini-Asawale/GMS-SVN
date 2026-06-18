@@ -76,12 +76,13 @@ import { createMainWindow, navigateMainWindow } from './window.js';
 
 const isHeadlessCli = isCliInvocation(process.argv);
 
-
+// Avoid blank/black window on some Windows GPUs in packaged builds.
+if (process.platform === 'win32' && app.isPackaged && !isHeadlessCli) {
+  app.disableHardwareAcceleration();
+}
 
 if (isHeadlessCli) {
-
   app.disableHardwareAcceleration();
-
 }
 
 
@@ -398,11 +399,7 @@ if (!gotSingleInstanceLock) {
 
     registerIpc();
 
-    await ensureExplorerShellIntegration();
-
     const parsed = parseCliArgs(process.argv);
-
-
 
     if (isHeadlessCli && parsed?.action !== 'open' && parsed?.action !== 'checkout') {
 
@@ -428,7 +425,8 @@ if (!gotSingleInstanceLock) {
 
     focusOrOpenWindow(cliLaunchTarget(process.argv));
 
-
+    // Register Explorer menu after UI is visible (UAC prompt no longer blocks first paint).
+    void ensureExplorerShellIntegration();
 
     app.on('activate', () => {
 

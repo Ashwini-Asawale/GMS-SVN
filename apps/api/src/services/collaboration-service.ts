@@ -10,8 +10,8 @@ async function nextIssueNumber(repositoryId: string): Promise<number> {
   return (last?.number ?? 0) + 1;
 }
 
-async function assertRepository(repositoryId: string) {
-  const repo = await prisma.repository.findUnique({ where: { id: repositoryId } });
+async function assertRepository(tenantId: string, repositoryId: string) {
+  const repo = await prisma.repository.findFirst({ where: { id: repositoryId, tenantId } });
   if (!repo) throw new Error('Repository not found');
   if (repo.status === 'ARCHIVED') throw new Error('Repository is archived');
   return repo;
@@ -49,8 +49,8 @@ function serializeIssue(issue: {
   };
 }
 
-export async function listIssues(repositoryId: string) {
-  await assertRepository(repositoryId);
+export async function listIssues(tenantId: string, repositoryId: string) {
+  await assertRepository(tenantId, repositoryId);
   const issues = await prisma.repoIssue.findMany({
     where: { repositoryId },
     orderBy: [{ status: 'asc' }, { number: 'desc' }],
@@ -63,6 +63,7 @@ export async function listIssues(repositoryId: string) {
 }
 
 export async function createIssue(
+  tenantId: string,
   repositoryId: string,
   userId: string,
   data: {
@@ -72,7 +73,7 @@ export async function createIssue(
     assigneeId?: string;
   },
 ) {
-  const repo = await assertRepository(repositoryId);
+  const repo = await assertRepository(tenantId, repositoryId);
   const number = await nextIssueNumber(repositoryId);
 
   const issue = await prisma.repoIssue.create({
@@ -102,6 +103,7 @@ export async function createIssue(
 }
 
 export async function updateIssue(
+  tenantId: string,
   repositoryId: string,
   issueId: string,
   userId: string,
@@ -113,7 +115,7 @@ export async function updateIssue(
     assigneeId?: string | null;
   },
 ) {
-  const repo = await assertRepository(repositoryId);
+  const repo = await assertRepository(tenantId, repositoryId);
   const existing = await prisma.repoIssue.findFirst({ where: { id: issueId, repositoryId } });
   if (!existing) throw new Error('Issue not found');
 
@@ -167,8 +169,8 @@ function serializeWikiPage(page: {
   };
 }
 
-export async function listWikiPages(repositoryId: string) {
-  await assertRepository(repositoryId);
+export async function listWikiPages(tenantId: string, repositoryId: string) {
+  await assertRepository(tenantId, repositoryId);
   const pages = await prisma.wikiPage.findMany({
     where: { repositoryId },
     orderBy: { title: 'asc' },
@@ -177,8 +179,8 @@ export async function listWikiPages(repositoryId: string) {
   return pages.map(serializeWikiPage);
 }
 
-export async function getWikiPage(repositoryId: string, slug: string) {
-  await assertRepository(repositoryId);
+export async function getWikiPage(tenantId: string, repositoryId: string, slug: string) {
+  await assertRepository(tenantId, repositoryId);
   const page = await prisma.wikiPage.findUnique({
     where: { repositoryId_slug: { repositoryId, slug } },
     include: { updatedBy: { select: { username: true } } },
@@ -188,11 +190,12 @@ export async function getWikiPage(repositoryId: string, slug: string) {
 }
 
 export async function createWikiPage(
+  tenantId: string,
   repositoryId: string,
   userId: string,
   data: { slug: string; title: string; content: string },
 ) {
-  const repo = await assertRepository(repositoryId);
+  const repo = await assertRepository(tenantId, repositoryId);
   const existing = await prisma.wikiPage.findUnique({
     where: { repositoryId_slug: { repositoryId, slug: data.slug } },
   });
@@ -220,12 +223,13 @@ export async function createWikiPage(
 }
 
 export async function updateWikiPage(
+  tenantId: string,
   repositoryId: string,
   slug: string,
   userId: string,
   data: { title?: string; content?: string },
 ) {
-  const repo = await assertRepository(repositoryId);
+  const repo = await assertRepository(tenantId, repositoryId);
   const existing = await prisma.wikiPage.findUnique({
     where: { repositoryId_slug: { repositoryId, slug } },
   });
@@ -287,8 +291,8 @@ function serializeReview(review: {
   };
 }
 
-export async function listReviewRequests(repositoryId: string) {
-  await assertRepository(repositoryId);
+export async function listReviewRequests(tenantId: string, repositoryId: string) {
+  await assertRepository(tenantId, repositoryId);
   const reviews = await prisma.reviewRequest.findMany({
     where: { repositoryId },
     orderBy: { createdAt: 'desc' },
@@ -301,11 +305,12 @@ export async function listReviewRequests(repositoryId: string) {
 }
 
 export async function createReviewRequest(
+  tenantId: string,
   repositoryId: string,
   userId: string,
   data: { title: string; svnPath: string; revision?: number; description?: string },
 ) {
-  const repo = await assertRepository(repositoryId);
+  const repo = await assertRepository(tenantId, repositoryId);
 
   const review = await prisma.reviewRequest.create({
     data: {
@@ -338,6 +343,7 @@ export async function createReviewRequest(
 }
 
 export async function decideReviewRequest(
+  tenantId: string,
   repositoryId: string,
   reviewId: string,
   reviewerId: string,
@@ -346,7 +352,7 @@ export async function decideReviewRequest(
 ) {
   if (!isAdmin) throw new Error('Admin access required to approve or reject reviews');
 
-  const repo = await assertRepository(repositoryId);
+  const repo = await assertRepository(tenantId, repositoryId);
   const existing = await prisma.reviewRequest.findFirst({
     where: { id: reviewId, repositoryId },
   });

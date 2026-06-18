@@ -159,90 +159,102 @@ export async function handlePostCommit(
     changedPaths?: string[];
   },
 ) {
-  const repo = await prisma.repository.findUnique({ where: { name: input.repositoryName } });
-  if (!repo) {
+  const repos = await prisma.repository.findMany({
+    where: { name: input.repositoryName, status: 'ACTIVE' },
+  });
+  if (repos.length === 0) {
     return { accepted: false, reason: 'Repository not found' };
   }
 
-  await prisma.repository.update({
-    where: { id: repo.id },
-    data: {
-      latestRevision: input.revision,
-      updatedAt: new Date(),
-    },
-  });
+  let lastResult: Record<string, unknown> = { accepted: false, reason: 'No pipeline processed' };
 
-  const pipeline = await prisma.repoPipelineConfig.findUnique({ where: { repositoryId: repo.id } });
-  if (!pipeline?.enabled) {
-    return { accepted: true, skipped: true, reason: 'Pipeline disabled', revision: input.revision };
-  }
+  for (const repo of repos) {
+    await prisma.repository.update({
+      where: { id: repo.id },
+      data: {
+        latestRevision: input.revision,
+        updatedAt: new Date(),
+      },
+    });
 
-  const existing = await prisma.pipelineBuild.findUnique({
-    where: { repositoryId_revision: { repositoryId: repo.id, revision: input.revision } },
-  });
-  if (existing) {
-    return { accepted: true, duplicate: true, buildId: existing.id };
-  }
+    const pipeline = await prisma.repoPipelineConfig.findUnique({ where: { repositoryId: repo.id } });
+    if (!pipeline?.enabled) {
+      lastResult = { accepted: true, skipped: true, reason: 'Pipeline disabled', revision: input.revision };
+      continue;
+    }
 
-  const changedPaths = input.changedPaths ?? [];
-  if (!matchesTriggers(changedPaths, pipeline.triggerPaths, pipeline.triggerBranches)) {
-    const skipped = await prisma.pipelineBuild.create({
+    const existing = await prisma.pipelineBuild.findUnique({
+      where: { repositoryId_revision: { repositoryId: repo.id, revision: input.revision } },
+    });
+    if (existing) {
+      lastResult = { accepted: true, duplicate: true, buildId: existing.id };
+      continue;
+    }
+
+    const changedPaths = input.changedPaths ?? [];
+    if (!matchesTriggers(changedPaths, pipeline.triggerPaths, pipeline.triggerBranches)) {
+      const skipped = await prisma.pipelineBuild.create({
+        data: {
+          repositoryId: repo.id,
+          configId: pipeline.id,
+          revision: input.revision,
+          status: 'SKIPPED',
+          author: input.author,
+          changedPaths,
+          completedAt: new Date(),
+          idempotencyKey: `build-${repo.id}-${input.revision}`,
+        },
+      });
+      lastResult = { accepted: true, skipped: true, buildId: skipped.id, reason: 'Path filter mismatch' };
+      continue;
+    }
+
+    if (!pipeline.webhookUrl) {
+      const skipped = await prisma.pipelineBuild.create({
+        data: {
+          repositoryId: repo.id,
+          configId: pipeline.id,
+          revision: input.revision,
+          status: 'SKIPPED',
+          author: input.author,
+          changedPaths,
+          errorMessage: 'No webhook URL configured',
+          completedAt: new Date(),
+          idempotencyKey: `build-${repo.id}-${input.revision}`,
+        },
+      });
+      lastResult = { accepted: true, skipped: true, buildId: skipped.id, reason: 'No webhook URL' };
+      continue;
+    }
+
+    const build = await prisma.pipelineBuild.create({
       data: {
         repositoryId: repo.id,
         configId: pipeline.id,
         revision: input.revision,
-        status: 'SKIPPED',
+        status: 'QUEUED',
         author: input.author,
         changedPaths,
-        completedAt: new Date(),
         idempotencyKey: `build-${repo.id}-${input.revision}`,
       },
     });
-    return { accepted: true, skipped: true, buildId: skipped.id, reason: 'Path filter mismatch' };
-  }
 
-  if (!pipeline.webhookUrl) {
-    const skipped = await prisma.pipelineBuild.create({
-      data: {
-        repositoryId: repo.id,
-        configId: pipeline.id,
-        revision: input.revision,
-        status: 'SKIPPED',
-        author: input.author,
-        changedPaths,
-        errorMessage: 'No webhook URL configured',
-        completedAt: new Date(),
-        idempotencyKey: `build-${repo.id}-${input.revision}`,
-      },
-    });
-    return { accepted: true, skipped: true, buildId: skipped.id, reason: 'No webhook URL' };
-  }
-
-  const build = await prisma.pipelineBuild.create({
-    data: {
+    await writeAuditLog({
+      action: 'pipeline.triggered',
       repositoryId: repo.id,
-      configId: pipeline.id,
-      revision: input.revision,
-      status: 'QUEUED',
-      author: input.author,
-      changedPaths,
-      idempotencyKey: `build-${repo.id}-${input.revision}`,
-    },
-  });
+      metadata: {
+        buildId: build.id,
+        revision: input.revision,
+        repositoryName: repo.name,
+      },
+    });
 
-  await writeAuditLog({
-    action: 'pipeline.triggered',
-    repositoryId: repo.id,
-    metadata: {
-      buildId: build.id,
-      revision: input.revision,
-      repositoryName: repo.name,
-    },
-  });
+    void enqueuePipelineDispatch(config, build.id);
 
-  void enqueuePipelineDispatch(config, build.id);
+    lastResult = { accepted: true, buildId: build.id, queued: true };
+  }
 
-  return { accepted: true, buildId: build.id, queued: true };
+  return lastResult;
 }
 
 export async function dispatchPipelineWebhook(config: AppConfig, buildId: string) {

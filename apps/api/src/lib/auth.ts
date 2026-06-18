@@ -8,6 +8,8 @@ export interface JwtPayload {
   sub: string;
   username: string;
   isAdmin: boolean;
+  tenantId: string;
+  tenantSlug: string;
 }
 
 function requireSecret(name: string, value: string | undefined): string {

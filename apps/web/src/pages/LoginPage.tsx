@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { PRODUCT_NAMES, SVN_LABELS } from '@gms-svn/shared';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../lib/api';
 
 export function LoginPage() {
   const { user, login } = useAuth();
+  const [tenantSlug, setTenantSlug] = useState(() => api.getStoredTenantSlug());
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -17,13 +19,15 @@ export function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(tenantSlug.trim().toLowerCase(), email, password);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('Internal server error') || msg.includes('500')) {
         setError('Server/database not ready. Start Docker Desktop, run npm run docker:up, then npm run db:seed.');
       } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
         setError('Cannot reach API. Run npm run dev on the server and open http://localhost:3001/health');
+      } else if (msg.includes('organization')) {
+        setError('Invalid organization or credentials');
       } else {
         setError('Invalid email or password');
       }
@@ -40,6 +44,19 @@ export function LoginPage() {
         <p className="mt-2 text-sm text-slate-400">Sign in to manage users and repositories</p>
 
         <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+          <label className="block text-sm">
+            <span className="text-slate-300">Organization</span>
+            <input
+              id="tenantSlug"
+              type="text"
+              autoComplete="organization"
+              required
+              value={tenantSlug}
+              onChange={(e) => setTenantSlug(e.target.value)}
+              placeholder="default"
+              className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 outline-none focus:border-blue-500"
+            />
+          </label>
           <label className="block text-sm">
             <span className="text-slate-300">Email</span>
             <input
@@ -76,7 +93,7 @@ export function LoginPage() {
         </form>
 
         <p className="mt-6 text-xs text-slate-500">
-          Demo: admin@gms.local / admin123 · dev1@gms.local / dev123
+          Demo: org <span className="font-mono">default</span> · admin@gms.local / admin123 · dev1@gms.local / dev123
         </p>
         <p className="mt-2 text-xs text-slate-600">
           {SVN_LABELS.checkout}, {SVN_LABELS.update}, {SVN_LABELS.commit}

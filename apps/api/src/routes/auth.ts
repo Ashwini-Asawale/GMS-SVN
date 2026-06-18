@@ -13,6 +13,8 @@ import { getClientIp, writeAuditLog } from '../lib/audit.js';
 import { authenticate } from '../middleware/auth.js';
 import { resolveSvnRepoRoot, upsertSvnPasswdUser } from '../services/svn-passwd-sync.js';
 import { findUserByLoginIdentifier } from '../lib/login-user.js';
+import { DEFAULT_TENANT_SLUG, findTenantBySlug } from '../lib/tenant.js';
+import { getPlatformSettings } from '../lib/platform-settings.js';
 
 export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/login', async (request, reply) => {
@@ -22,14 +24,27 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const { email, username, password } = parsed.data;
-    const user = await findUserByLoginIdentifier(email, username);
+    const tenantSlug = parsed.data.tenantSlug?.trim().toLowerCase() || DEFAULT_TENANT_SLUG;
+    const tenant = await findTenantBySlug(tenantSlug);
     const loginLabel = email?.trim() || username?.trim() || '';
     const ip = getClientIp(request.headers);
+
+    if (!tenant) {
+      await writeAuditLog({
+        action: 'auth.login_failed',
+        metadata: { email: loginLabel, tenantSlug },
+        sourceIp: ip,
+      });
+      return reply.status(401).send({ error: 'Invalid organization or credentials' });
+    }
+
+    const user = await findUserByLoginIdentifier(tenant.id, email, username);
 
     if (!user || !user.isActive) {
       await writeAuditLog({
         action: 'auth.login_failed',
-        metadata: { email: loginLabel },
+        tenantId: tenant.id,
+        metadata: { email: loginLabel, tenantSlug },
         sourceIp: ip,
       });
       return reply.status(401).send({ error: 'Invalid email or password' });
@@ -39,14 +54,21 @@ export async function authRoutes(app: FastifyInstance) {
     if (!valid) {
       await writeAuditLog({
         action: 'auth.login_failed',
+        tenantId: tenant.id,
         userId: user.id,
-        metadata: { email: user.email, username: user.username },
+        metadata: { email: user.email, username: user.username, tenantSlug },
         sourceIp: ip,
       });
       return reply.status(401).send({ error: 'Invalid email or password' });
     }
 
-    const payload = { sub: user.id, username: user.username, isAdmin: user.isAdmin };
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      isAdmin: user.isAdmin,
+      tenantId: tenant.id,
+      tenantSlug: tenant.slug,
+    };
     const accessToken = signAccessToken(payload);
     const refreshToken = signRefreshToken(payload);
 
@@ -60,20 +82,30 @@ export async function authRoutes(app: FastifyInstance) {
 
     await writeAuditLog({
       action: 'auth.login',
+      tenantId: tenant.id,
       userId: user.id,
       sourceIp: ip,
     });
 
     try {
-      upsertSvnPasswdUser(resolveSvnRepoRoot(), user.username, password);
+      const settings = await getPlatformSettings(tenant.id);
+      upsertSvnPasswdUser(resolveSvnRepoRoot(settings.visualsvnRepoRoot), user.username, password);
     } catch (err) {
       request.log.warn({ err }, 'SVN passwd sync failed on login');
     }
 
+    const userRecord = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        ...userSelect(),
+        tenant: { select: { id: true, slug: true, name: true } },
+      },
+    });
+
     return {
       accessToken,
       refreshToken,
-      user: await prisma.user.findUnique({ where: { id: user.id }, select: userSelect() }),
+      user: userRecord,
     };
   });
 
@@ -94,12 +126,21 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.status(401).send({ error: 'Invalid refresh token' });
       }
 
-      const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-      if (!user || !user.isActive) {
+      const user = await prisma.user.findUnique({
+        where: { id: payload.sub },
+        include: { tenant: { select: { id: true, slug: true, isActive: true } } },
+      });
+      if (!user || !user.isActive || !user.tenant.isActive) {
         return reply.status(401).send({ error: 'User inactive' });
       }
 
-      const newPayload = { sub: user.id, username: user.username, isAdmin: user.isAdmin };
+      const newPayload = {
+        sub: user.id,
+        username: user.username,
+        isAdmin: user.isAdmin,
+        tenantId: user.tenant.id,
+        tenantSlug: user.tenant.slug,
+      };
       return { accessToken: signAccessToken(newPayload) };
     } catch {
       return reply.status(401).send({ error: 'Invalid refresh token' });
@@ -116,6 +157,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     await writeAuditLog({
       action: 'auth.logout',
+      tenantId: request.user!.tenantId,
       userId: request.user!.sub,
       sourceIp: getClientIp(request.headers),
     });
@@ -124,10 +166,11 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   app.get('/auth/me', { preHandler: authenticate }, async (request, reply) => {
-    const user = await prisma.user.findUnique({
-      where: { id: request.user!.sub },
+    const user = await prisma.user.findFirst({
+      where: { id: request.user!.sub, tenantId: request.user!.tenantId },
       select: {
         ...userSelect(),
+        tenant: { select: { id: true, slug: true, name: true } },
         groupMembers: {
           select: {
             group: { select: { id: true, name: true } },

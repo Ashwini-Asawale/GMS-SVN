@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth.js';
 import { writeAuditLog, getClientIp } from '../lib/audit.js';
 import { getClientVisibleRepos } from '../services/client-repo-service.js';
 import { prisma } from '../lib/prisma.js';
+import { tenantIdFromRequest } from '../lib/tenant.js';
 import type { AuditAction } from '@gms-svn/shared';
 
 const CLIENT_AUDIT_ACTIONS = new Set<string>([
@@ -20,10 +21,12 @@ export async function clientRoutes(app: FastifyInstance) {
 
   app.get('/client/repos', async (request) => {
     const user = request.user!;
-    return getClientVisibleRepos(user.sub, user.isAdmin);
+    const tenantId = tenantIdFromRequest(request);
+    return getClientVisibleRepos(tenantId, user.sub, user.isAdmin);
   });
 
   app.post('/client/audit-events', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const parsed = clientAuditEventSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
@@ -38,13 +41,14 @@ export async function clientRoutes(app: FastifyInstance) {
     let resolvedRepositoryId = repositoryId ?? null;
     if (!resolvedRepositoryId && repositoryName) {
       const repo = await prisma.repository.findFirst({
-        where: { name: repositoryName, status: 'ACTIVE' },
+        where: { tenantId, name: repositoryName, status: 'ACTIVE' },
       });
       resolvedRepositoryId = repo?.id ?? null;
     }
 
     await writeAuditLog({
       action: action as AuditAction,
+      tenantId,
       userId: request.user!.sub,
       repositoryId: resolvedRepositoryId ?? undefined,
       metadata: {

@@ -1,6 +1,7 @@
 import type { PlatformStorageSettings, StorageBackend } from '@gms-svn/shared';
 import { DEFAULT_STORAGE_SETTINGS } from '@gms-svn/shared';
 import { prisma } from './prisma.js';
+import { DEFAULT_TENANT_ID } from './tenant.js';
 
 export const SETTING_KEYS = {
   gmsSvnServerHost: 'gms_svn.server_host',
@@ -19,9 +20,9 @@ function parseBackend(value: string | undefined): StorageBackend {
   return value === 'smb' ? 'smb' : 'iscsi';
 }
 
-export async function getPlatformSettings(): Promise<PlatformStorageSettings> {
+export async function getPlatformSettings(tenantId: string = DEFAULT_TENANT_ID): Promise<PlatformStorageSettings> {
   const rows = await prisma.platformSetting.findMany({
-    where: { key: { in: ALL_KEYS } },
+    where: { tenantId, key: { in: ALL_KEYS } },
   });
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
 
@@ -39,6 +40,7 @@ export async function getPlatformSettings(): Promise<PlatformStorageSettings> {
 }
 
 export async function upsertPlatformSettings(
+  tenantId: string,
   partial: Partial<PlatformStorageSettings>,
 ): Promise<PlatformStorageSettings> {
   const entries: [string, string | undefined][] = [
@@ -55,17 +57,17 @@ export async function upsertPlatformSettings(
   for (const [key, value] of entries) {
     if (value !== undefined) {
       await prisma.platformSetting.upsert({
-        where: { key },
-        create: { key, value },
+        where: { tenantId_key: { tenantId, key } },
+        create: { tenantId, key, value },
         update: { value },
       });
     }
   }
 
-  return getPlatformSettings();
+  return getPlatformSettings(tenantId);
 }
 
-export async function seedDefaultPlatformSettings(): Promise<void> {
+export async function seedDefaultPlatformSettings(tenantId: string = DEFAULT_TENANT_ID): Promise<void> {
   const defaults: [string, string][] = [
     [SETTING_KEYS.gmsSvnServerHost, DEFAULT_STORAGE_SETTINGS.gmsSvnServerHost],
     [SETTING_KEYS.visualsvnUrl, DEFAULT_STORAGE_SETTINGS.visualsvnUrl],
@@ -79,8 +81,8 @@ export async function seedDefaultPlatformSettings(): Promise<void> {
 
   for (const [key, value] of defaults) {
     await prisma.platformSetting.upsert({
-      where: { key },
-      create: { key, value },
+      where: { tenantId_key: { tenantId, key } },
+      create: { tenantId, key, value },
       update: {},
     });
   }

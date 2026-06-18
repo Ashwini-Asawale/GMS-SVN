@@ -7,6 +7,7 @@ import {
 import { prisma } from '../lib/prisma.js';
 import { getClientIp, writeAuditLog } from '../lib/audit.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { tenantIdFromRequest } from '../lib/tenant.js';
 
 function groupWithMembers() {
   return {
@@ -29,14 +30,17 @@ export async function groupRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate);
   app.addHook('preHandler', requireAdmin);
 
-  app.get('/groups', async () => {
+  app.get('/groups', async (request) => {
+    const tenantId = tenantIdFromRequest(request);
     return prisma.group.findMany({
+      where: { tenantId },
       select: groupWithMembers(),
       orderBy: { name: 'asc' },
     });
   });
 
   app.post('/groups', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const parsed = createGroupSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
@@ -44,12 +48,13 @@ export async function groupRoutes(app: FastifyInstance) {
 
     try {
       const group = await prisma.group.create({
-        data: parsed.data,
+        data: { tenantId, ...parsed.data },
         select: groupWithMembers(),
       });
 
       await writeAuditLog({
         action: 'group.created',
+        tenantId,
         userId: request.user!.sub,
         metadata: { groupId: group.id, name: group.name },
         sourceIp: getClientIp(request.headers),
@@ -62,10 +67,16 @@ export async function groupRoutes(app: FastifyInstance) {
   });
 
   app.patch('/groups/:id', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id } = request.params as { id: string };
     const parsed = updateGroupSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
+    }
+
+    const existing = await prisma.group.findFirst({ where: { id, tenantId } });
+    if (!existing) {
+      return reply.status(404).send({ error: 'Group not found' });
     }
 
     try {
@@ -77,6 +88,7 @@ export async function groupRoutes(app: FastifyInstance) {
 
       await writeAuditLog({
         action: 'group.updated',
+        tenantId,
         userId: request.user!.sub,
         metadata: { groupId: id },
         sourceIp: getClientIp(request.headers),
@@ -89,12 +101,19 @@ export async function groupRoutes(app: FastifyInstance) {
   });
 
   app.delete('/groups/:id', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id } = request.params as { id: string };
+
+    const existing = await prisma.group.findFirst({ where: { id, tenantId } });
+    if (!existing) {
+      return reply.status(404).send({ error: 'Group not found' });
+    }
 
     try {
       await prisma.group.delete({ where: { id } });
       await writeAuditLog({
         action: 'group.deleted',
+        tenantId,
         userId: request.user!.sub,
         metadata: { groupId: id },
         sourceIp: getClientIp(request.headers),
@@ -106,10 +125,23 @@ export async function groupRoutes(app: FastifyInstance) {
   });
 
   app.post('/groups/:id/members', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id: groupId } = request.params as { id: string };
     const parsed = addGroupMemberSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
+    }
+
+    const group = await prisma.group.findFirst({ where: { id: groupId, tenantId } });
+    if (!group) {
+      return reply.status(404).send({ error: 'Group not found' });
+    }
+
+    const member = await prisma.user.findFirst({
+      where: { id: parsed.data.userId, tenantId },
+    });
+    if (!member) {
+      return reply.status(400).send({ error: 'User not found in this organization' });
     }
 
     try {
@@ -119,24 +151,31 @@ export async function groupRoutes(app: FastifyInstance) {
 
       await writeAuditLog({
         action: 'group.member_added',
+        tenantId,
         userId: request.user!.sub,
         metadata: { groupId, memberUserId: parsed.data.userId },
         sourceIp: getClientIp(request.headers),
       });
 
-      const group = await prisma.group.findUnique({
+      const updated = await prisma.group.findUnique({
         where: { id: groupId },
         select: groupWithMembers(),
       });
 
-      return reply.status(201).send(group);
+      return reply.status(201).send(updated);
     } catch {
       return reply.status(409).send({ error: 'User already in group or invalid reference' });
     }
   });
 
   app.delete('/groups/:id/members/:userId', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id: groupId, userId } = request.params as { id: string; userId: string };
+
+    const group = await prisma.group.findFirst({ where: { id: groupId, tenantId } });
+    if (!group) {
+      return reply.status(404).send({ error: 'Group not found' });
+    }
 
     try {
       await prisma.groupMember.delete({
@@ -145,6 +184,7 @@ export async function groupRoutes(app: FastifyInstance) {
 
       await writeAuditLog({
         action: 'group.member_removed',
+        tenantId,
         userId: request.user!.sub,
         metadata: { groupId, memberUserId: userId },
         sourceIp: getClientIp(request.headers),

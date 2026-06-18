@@ -7,6 +7,7 @@ export interface StoredAuth {
   email?: string;
   svnPassword?: string;
   isAdmin: boolean;
+  tenantSlug?: string;
 }
 
 export interface WorkingCopy {

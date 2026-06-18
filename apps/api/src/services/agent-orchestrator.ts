@@ -6,9 +6,11 @@ import { getAgentClient, newCorrelationId, newIdempotencyKey } from '../lib/agen
 import { agentCommandEvents } from '../lib/agent-events.js';
 import { writeAuditLog } from '../lib/audit.js';
 import { getPlatformSettings } from '../lib/platform-settings.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import type { AppConfig } from '../config.js';
 
 export interface DispatchOptions {
+  tenantId?: string;
   repositoryId?: string;
   requestedById?: string;
   idempotencyKey?: string;
@@ -44,8 +46,8 @@ function emitUpdate(row: {
 export class AgentOrchestrator {
   constructor(private readonly config: AppConfig) {}
 
-  private async clientWithSettings() {
-    const settings = await getPlatformSettings();
+  private async clientWithSettings(tenantId: string = DEFAULT_TENANT_ID) {
+    const settings = await getPlatformSettings(tenantId);
     return getAgentClient({
       baseUrl: this.config.agentBaseUrl,
       hmacSecret: this.config.agentHmacSecret,
@@ -117,7 +119,12 @@ export class AgentOrchestrator {
     emitUpdate(updated);
 
     try {
-      const agentClient = await this.clientWithSettings();
+      const tenantId =
+        (command.repositoryId
+          ? (await prisma.repository.findUnique({ where: { id: command.repositoryId }, select: { tenantId: true } }))
+              ?.tenantId
+          : undefined) ?? DEFAULT_TENANT_ID;
+      const agentClient = await this.clientWithSettings(tenantId);
       const result = await agentClient.execute(
         command.commandType as AgentCommandType,
         command.payload as Record<string, unknown>,
@@ -180,10 +187,10 @@ export class AgentOrchestrator {
     if (!success || !command.repositoryId) return;
 
     if (command.commandType === 'CreateRepository') {
-      const settings = await getPlatformSettings();
       const repo = await prisma.repository.findUnique({ where: { id: command.repositoryId } });
       if (!repo) return;
 
+      const settings = await getPlatformSettings(repo.tenantId);
       const svnUrl = `${settings.visualsvnUrl.replace(/\/$/, '')}/${repo.name}`;
       await prisma.repository.update({
         where: { id: command.repositoryId },
@@ -197,23 +204,24 @@ export class AgentOrchestrator {
     }
   }
 
-  async createRepository(name: string, requestedById: string) {
+  async createRepository(tenantId: string, name: string, requestedById: string) {
     const slug = slugify(name);
     const existing = await prisma.repository.findFirst({
-      where: { OR: [{ name }, { slug }] },
+      where: { tenantId, OR: [{ name }, { slug }] },
     });
     if (existing) {
       throw new Error('Repository name already exists');
     }
 
     const repository = await prisma.repository.create({
-      data: { name, slug, status: 'PENDING' },
+      data: { tenantId, name, slug, status: 'PENDING' },
     });
 
     const command = await this.dispatchCommand(
       'CreateRepository',
       { name, layout: 'standard' },
       {
+        tenantId,
         repositoryId: repository.id,
         requestedById,
         idempotencyKey: newIdempotencyKey(`create-repo-${repository.id}`),
@@ -230,14 +238,38 @@ export class AgentOrchestrator {
     return { repository, command };
   }
 
-  async syncRepositories(requestedById?: string) {
-    await this.reprocessPendingRepositories();
+  async syncRepositories(requestedById?: string, tenantId?: string) {
+    const tenantIds = tenantId
+      ? [tenantId]
+      : (await prisma.tenant.findMany({ where: { isActive: true }, select: { id: true } })).map(
+          (t) => t.id,
+        );
+
+    let totalSynced = 0;
+    let lastCommandId: string | undefined;
+
+    for (const tid of tenantIds) {
+      const result = await this.syncTenantRepositories(tid, requestedById);
+      totalSynced += result.synced;
+      lastCommandId = result.commandId;
+    }
+
+    return { synced: totalSynced, commandId: lastCommandId };
+  }
+
+  private async syncTenantRepositories(tenantId: string, requestedById?: string) {
+    await this.reprocessPendingRepositories(tenantId);
 
     const correlationId = newCorrelationId();
     const command = await this.dispatchCommand(
       'ListRepositories',
       {},
-      { requestedById, correlationId, idempotencyKey: newIdempotencyKey('list-repos') },
+      {
+        tenantId,
+        requestedById,
+        correlationId,
+        idempotencyKey: newIdempotencyKey(`list-repos-${tenantId}`),
+      },
     );
 
     await this.waitForCommand(command.id, 60_000);
@@ -251,13 +283,14 @@ export class AgentOrchestrator {
       data?: { repositories?: { name: string; latestRevision: number | null; sizeBytes: string | null }[] };
     };
     const list = result.data?.repositories ?? [];
-    const settings = await getPlatformSettings();
+    const settings = await getPlatformSettings(tenantId);
 
     for (const item of list) {
       const slug = slugify(item.name);
       await prisma.repository.upsert({
-        where: { name: item.name },
+        where: { tenantId_name: { tenantId, name: item.name } },
         create: {
+          tenantId,
           name: item.name,
           slug,
           status: 'ACTIVE',
@@ -273,13 +306,13 @@ export class AgentOrchestrator {
       });
     }
 
-    const activeRepos = await prisma.repository.findMany({ where: { status: 'ACTIVE' } });
+    const activeRepos = await prisma.repository.findMany({ where: { tenantId, status: 'ACTIVE' } });
     for (const repo of activeRepos) {
       try {
         const data = await this.executeQuery(
           'GetRepositoryStatus',
           { repositoryName: repo.name },
-          { repositoryId: repo.id },
+          { tenantId, repositoryId: repo.id },
         );
         const status = data as { latestRevision?: number | null; sizeBytes?: string | null };
         await prisma.repository.update({
@@ -297,8 +330,8 @@ export class AgentOrchestrator {
     return { synced: list.length, commandId: command.id };
   }
 
-  private async reprocessPendingRepositories() {
-    const pending = await prisma.repository.findMany({ where: { status: 'PENDING' } });
+  private async reprocessPendingRepositories(tenantId: string) {
+    const pending = await prisma.repository.findMany({ where: { tenantId, status: 'PENDING' } });
     for (const repo of pending) {
       let command = await prisma.agentCommand.findFirst({
         where: { repositoryId: repo.id, commandType: 'CreateRepository' },
@@ -323,6 +356,7 @@ export class AgentOrchestrator {
             'CreateRepository',
             { name: repo.name, layout: 'standard' },
             {
+              tenantId,
               repositoryId: repo.id,
               requestedById: undefined,
               idempotencyKey: newIdempotencyKey(`create-repo-retry-${repo.id}`),

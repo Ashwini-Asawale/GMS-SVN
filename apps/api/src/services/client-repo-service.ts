@@ -13,19 +13,19 @@ function withLiveSvnUrl<T extends { name: string; status: string; svnUrl: string
   };
 }
 
-export async function getClientVisibleRepos(userId: string, isAdmin: boolean) {
-  const settings = await getPlatformSettings();
+export async function getClientVisibleRepos(tenantId: string, userId: string, isAdmin: boolean) {
+  const settings = await getPlatformSettings(tenantId);
 
   if (isAdmin) {
     const repos = await prisma.repository.findMany({
-      where: { status: 'ACTIVE' },
+      where: { tenantId, status: 'ACTIVE' },
       orderBy: { name: 'asc' },
     });
     return repos.map((r) => withLiveSvnUrl(serializeRepository(r), settings.visualsvnUrl));
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
+  const user = await prisma.user.findFirst({
+    where: { id: userId, tenantId },
     include: { groupMembers: { include: { group: true } } },
   });
   if (!user) return [];
@@ -39,7 +39,7 @@ export async function getClientVisibleRepos(userId: string, isAdmin: boolean) {
         { principalType: 'USER', principalName: user.username },
         { principalType: 'GROUP', principalName: { in: groupNames } },
       ],
-      repository: { status: 'ACTIVE' },
+      repository: { tenantId, status: 'ACTIVE' },
     },
     include: { repository: true },
   });

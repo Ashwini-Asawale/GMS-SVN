@@ -5,13 +5,17 @@ import { hashPassword } from '../lib/auth.js';
 import { getClientIp, writeAuditLog } from '../lib/audit.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import { resolveSvnRepoRoot, upsertSvnPasswdUser, removeSvnPasswdUser } from '../services/svn-passwd-sync.js';
+import { tenantIdFromRequest } from '../lib/tenant.js';
+import { getPlatformSettings } from '../lib/platform-settings.js';
 
 export async function userRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate);
   app.addHook('preHandler', requireAdmin);
 
-  app.get('/users', async () => {
+  app.get('/users', async (request) => {
+    const tenantId = tenantIdFromRequest(request);
     const users = await prisma.user.findMany({
+      where: { tenantId },
       select: {
         ...userSelect(),
         groupMembers: {
@@ -29,6 +33,7 @@ export async function userRoutes(app: FastifyInstance) {
   });
 
   app.post('/users', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const parsed = createUserSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
@@ -39,19 +44,21 @@ export async function userRoutes(app: FastifyInstance) {
 
     try {
       const user = await prisma.user.create({
-        data: { username, email, passwordHash, isAdmin },
+        data: { tenantId, username, email, passwordHash, isAdmin },
         select: userSelect(),
       });
 
       await writeAuditLog({
         action: 'user.created',
+        tenantId,
         userId: request.user!.sub,
         metadata: { targetUserId: user.id, username },
         sourceIp: getClientIp(request.headers),
       });
 
       try {
-        upsertSvnPasswdUser(resolveSvnRepoRoot(), username, password);
+        const settings = await getPlatformSettings(tenantId);
+        upsertSvnPasswdUser(resolveSvnRepoRoot(settings.visualsvnRepoRoot), username, password);
       } catch {
         // non-fatal when repo root unavailable
       }
@@ -63,10 +70,16 @@ export async function userRoutes(app: FastifyInstance) {
   });
 
   app.patch('/users/:id', async (request, reply) => {
+    const tenantId = tenantIdFromRequest(request);
     const { id } = request.params as { id: string };
     const parsed = updateUserSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
+    }
+
+    const existing = await prisma.user.findFirst({ where: { id, tenantId } });
+    if (!existing) {
+      return reply.status(404).send({ error: 'User not found' });
     }
 
     const data: Record<string, unknown> = {};
@@ -84,13 +97,15 @@ export async function userRoutes(app: FastifyInstance) {
 
       await writeAuditLog({
         action: parsed.data.isActive === false ? 'user.disabled' : 'user.updated',
+        tenantId,
         userId: request.user!.sub,
         metadata: { targetUserId: id, changes: Object.keys(parsed.data) },
         sourceIp: getClientIp(request.headers),
       });
 
       try {
-        const repoRoot = resolveSvnRepoRoot();
+        const settings = await getPlatformSettings(tenantId);
+        const repoRoot = resolveSvnRepoRoot(settings.visualsvnRepoRoot);
         if (parsed.data.password) {
           upsertSvnPasswdUser(repoRoot, user.username, parsed.data.password);
         }

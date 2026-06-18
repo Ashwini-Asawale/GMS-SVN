@@ -9,6 +9,7 @@ export interface StoredAuth {
   email?: string;
   svnPassword?: string;
   isAdmin: boolean;
+  tenantSlug?: string;
 }
 
 function authFilePath(): string {

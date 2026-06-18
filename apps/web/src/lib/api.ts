@@ -8,6 +8,7 @@ export interface ApiUser {
   email: string;
   isAdmin: boolean;
   isActive: boolean;
+  tenant?: { id: string; slug: string; name: string };
   groups?: { id: string; name: string }[];
 }
 
@@ -129,9 +130,18 @@ class ApiClient {
     else localStorage.removeItem('refreshToken');
   }
 
+  getStoredTenantSlug(): string {
+    return localStorage.getItem('tenantSlug') ?? 'default';
+  }
+
+  setStoredTenantSlug(slug: string) {
+    localStorage.setItem('tenantSlug', slug);
+  }
+
   clearStorage() {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('tenantSlug');
     this.accessToken = null;
     this.refreshToken = null;
   }
@@ -251,10 +261,10 @@ class ApiClient {
     }
   }
 
-  login(email: string, password: string) {
+  login(tenantSlug: string, email: string, password: string) {
     return this.request<LoginResponse>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, username: email, password }),
+      body: JSON.stringify({ tenantSlug, email, username: email, password }),
     });
   }
 

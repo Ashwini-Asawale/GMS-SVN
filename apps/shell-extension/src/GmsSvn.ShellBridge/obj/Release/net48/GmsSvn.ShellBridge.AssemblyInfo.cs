@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("Invokes GMS SVN CLIENT CLI from Explorer context menu")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0d60702cd5690a44111eb308af8b6e6ca330525e")]
 [assembly: System.Reflection.AssemblyProductAttribute("GMS SVN Shell Bridge")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GmsSvn.ShellBridge")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

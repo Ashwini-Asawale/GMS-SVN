@@ -357,9 +357,10 @@ if ($sfx) {
 ;!@Install@!UTF-8!
 Title="GMS SVN CLIENT Setup"
 BeginPrompt="Install GMS SVN CLIENT on this computer?"
+Progress="yes"
+GUIMode="1"
 ExecuteFile="powershell.exe"
-ExecuteParameters="-NoProfile -ExecutionPolicy Bypass -File install-client.ps1"
-GUIMode="2"
+ExecuteParameters="-NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -File install-client.ps1"
 ;!@InstallEnd@!
 '@ | Set-Content -Path $config -Encoding UTF8
   if (Test-Path $OutputExe) { Remove-Item $OutputExe -Force }

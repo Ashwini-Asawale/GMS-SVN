@@ -4,11 +4,22 @@ import { PRODUCT_NAMES } from '@gms-svn/shared';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
+const TENANT_STORAGE_KEY = 'gms-tenant-slug';
+
+function getStoredTenantSlug(): string {
+  try {
+    return localStorage.getItem(TENANT_STORAGE_KEY) ?? 'default';
+  } catch {
+    return 'default';
+  }
+}
+
 export function LoginPage() {
   const { login } = useAuth();
   const [searchParams] = useSearchParams();
   const explorerAction = searchParams.get('explorerAction');
   const fromExplorer = searchParams.get('fromExplorer') === '1';
+  const [tenantSlug, setTenantSlug] = useState(getStoredTenantSlug);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -18,8 +29,14 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    const slug = tenantSlug.trim().toLowerCase();
     try {
-      const res = await api.login(email, password);
+      const res = await api.login(slug, email, password);
+      try {
+        localStorage.setItem(TENANT_STORAGE_KEY, slug);
+      } catch {
+        // ignore storage errors
+      }
       await login({
         accessToken: res.accessToken,
         refreshToken: res.refreshToken,
@@ -27,6 +44,7 @@ export function LoginPage() {
         email: res.user.email,
         svnPassword: password,
         isAdmin: res.user.isAdmin,
+        tenantSlug: slug,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -51,6 +69,19 @@ export function LoginPage() {
         )}
         <form onSubmit={submit} className="mt-8 space-y-4">
           <label className="block text-sm">
+            <span className="text-slate-400">Organization</span>
+            <input
+              type="text"
+              autoComplete="organization"
+              value={tenantSlug}
+              onChange={(e) => setTenantSlug(e.target.value)}
+              placeholder="default"
+              className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+              required
+              autoFocus
+            />
+          </label>
+          <label className="block text-sm">
             <span className="text-slate-400">Email</span>
             <input
               type="email"
@@ -60,7 +91,6 @@ export function LoginPage() {
               placeholder="dev1@gms.local"
               className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
               required
-              autoFocus
             />
           </label>
           <label className="block text-sm">
@@ -83,7 +113,7 @@ export function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-        <p className="mt-6 text-xs text-slate-500">Demo: dev1@gms.local / dev123</p>
+        <p className="mt-6 text-xs text-slate-500">Demo: org default · dev1@gms.local / dev123</p>
       </div>
     </div>
   );

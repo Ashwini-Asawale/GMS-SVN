@@ -23,8 +23,8 @@ export function toCsv(headers: string[], rows: (string | number | null | undefin
   return `${lines.join('\r\n')}\r\n`;
 }
 
-async function resolveReportsDir(): Promise<string> {
-  const settings = await getPlatformSettings();
+async function resolveReportsDir(tenantId: string): Promise<string> {
+  const settings = await getPlatformSettings(tenantId);
   const configured = settings.storageReportsPath?.trim();
   const fallback = path.resolve(process.cwd(), '../../data/reports');
   const candidates = configured ? [configured, fallback] : [fallback];
@@ -43,16 +43,17 @@ async function resolveReportsDir(): Promise<string> {
   return fallback;
 }
 
-export async function saveReportFile(filename: string, content: Buffer | string): Promise<string> {
-  const dir = await resolveReportsDir();
+export async function saveReportFile(tenantId: string, filename: string, content: Buffer | string): Promise<string> {
+  const dir = await resolveReportsDir(tenantId);
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
   const fullPath = path.join(dir, safeName);
   await fs.writeFile(fullPath, content);
   return fullPath;
 }
 
-export async function generateUsersCsv(): Promise<{ csv: string; filename: string }> {
+export async function generateUsersCsv(tenantId: string): Promise<{ csv: string; filename: string }> {
   const users = await prisma.user.findMany({
+    where: { tenantId },
     orderBy: { username: 'asc' },
     include: {
       groupMembers: {
@@ -72,12 +73,12 @@ export async function generateUsersCsv(): Promise<{ csv: string; filename: strin
 
   const csv = toCsv(['Username', 'Email', 'Admin', 'Active', 'Groups', 'Created'], rows);
   const filename = `users-${timestamp()}.csv`;
-  await saveReportFile(filename, csv);
+  await saveReportFile(tenantId, filename, csv);
   return { csv, filename };
 }
 
-export async function generateRepositoriesCsv(): Promise<{ csv: string; filename: string }> {
-  const repos = await prisma.repository.findMany({ orderBy: { name: 'asc' } });
+export async function generateRepositoriesCsv(tenantId: string): Promise<{ csv: string; filename: string }> {
+  const repos = await prisma.repository.findMany({ where: { tenantId }, orderBy: { name: 'asc' } });
 
   const rows = repos.map((r) => [
     r.name,
@@ -90,18 +91,20 @@ export async function generateRepositoriesCsv(): Promise<{ csv: string; filename
 
   const csv = toCsv(['Name', 'Status', 'SVN URL', 'Latest Revision', 'Size (bytes)', 'Updated'], rows);
   const filename = `repositories-${timestamp()}.csv`;
-  await saveReportFile(filename, csv);
+  await saveReportFile(tenantId, filename, csv);
   return { csv, filename };
 }
 
-export async function generateAuditLogCsv(filters: {
+export async function generateAuditLogCsv(
+  tenantId: string,
+  filters: {
   userId?: string;
   action?: AuditAction;
   repositoryId?: string;
   from?: Date;
   to?: Date;
 }): Promise<{ csv: string; filename: string }> {
-  const items = await fetchAllAuditLogs(filters);
+  const items = await fetchAllAuditLogs({ tenantId, ...filters });
 
   const rows = items.map((item) => auditRow(item));
   const csv = toCsv(
@@ -109,7 +112,7 @@ export async function generateAuditLogCsv(filters: {
     rows,
   );
   const filename = `audit-log-${timestamp()}.csv`;
-  await saveReportFile(filename, csv);
+  await saveReportFile(tenantId, filename, csv);
   return { csv, filename };
 }
 
@@ -127,18 +130,21 @@ function auditRow(item: AuditLogItem): (string | null)[] {
 }
 
 export async function generateAccessRulesPdf(
+  tenantId: string,
   repositoryId?: string,
 ): Promise<{ buffer: Buffer; filename: string; savedPath: string }> {
   const repos = repositoryId
-    ? await prisma.repository.findMany({ where: { id: repositoryId }, orderBy: { name: 'asc' } })
-    : await prisma.repository.findMany({ orderBy: { name: 'asc' } });
+    ? await prisma.repository.findMany({ where: { id: repositoryId, tenantId }, orderBy: { name: 'asc' } })
+    : await prisma.repository.findMany({ where: { tenantId }, orderBy: { name: 'asc' } });
 
   if (repos.length === 0) {
     throw new Error('No repositories found');
   }
 
   const rules = await prisma.repoAccessRule.findMany({
-    where: repositoryId ? { repositoryId } : undefined,
+    where: repositoryId
+      ? { repositoryId, repository: { tenantId } }
+      : { repository: { tenantId } },
     orderBy: [{ repositoryId: 'asc' }, { path: 'asc' }, { principalName: 'asc' }],
     include: { repository: { select: { name: true } } },
   });
@@ -184,7 +190,7 @@ export async function generateAccessRulesPdf(
 
   const repoSuffix = repositoryId ? repos[0]!.name.replace(/[^a-zA-Z0-9._-]/g, '_') : 'all';
   const filename = `access-rules-${repoSuffix}-${timestamp()}.pdf`;
-  const savedPath = await saveReportFile(filename, buffer);
+  const savedPath = await saveReportFile(tenantId, filename, buffer);
   return { buffer, filename, savedPath };
 }
 
@@ -197,13 +203,14 @@ interface LogEntry {
 
 export async function generateCommitHistoryCsv(
   config: AppConfig,
+  tenantId: string,
   repositoryId: string,
   logPath: string,
   limit: number,
   userId: string,
 ): Promise<{ csv: string; filename: string }> {
-  const repo = await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } });
-  const data = (await getRepositoryLog(config, repositoryId, logPath, limit, userId)) as {
+  const repo = await prisma.repository.findFirstOrThrow({ where: { id: repositoryId, tenantId } });
+  const data = (await getRepositoryLog(config, tenantId, repositoryId, logPath, limit, userId)) as {
     entries?: LogEntry[];
   };
   const entries = data.entries ?? [];
@@ -211,7 +218,7 @@ export async function generateCommitHistoryCsv(
   const rows = entries.map((e) => [e.revision ?? '', e.author ?? '', e.date ?? '', e.message ?? '']);
   const csv = toCsv(['Revision', 'Author', 'Date', 'Message'], rows);
   const filename = `commit-history-${repo.name.replace(/[^a-zA-Z0-9._-]/g, '_')}-${timestamp()}.csv`;
-  await saveReportFile(filename, csv);
+  await saveReportFile(tenantId, filename, csv);
   return { csv, filename };
 }
 

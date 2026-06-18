@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 export const loginSchema = z
   .object({
+    tenantSlug: z
+      .string()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9-]+$/, 'Invalid organization slug')
+      .optional(),
     email: z.string().email().optional(),
     username: z.string().min(1).optional(),
     password: z.string().min(1),

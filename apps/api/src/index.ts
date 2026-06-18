@@ -18,7 +18,7 @@ import { hookRoutes, pipelineRoutes } from './routes/pipeline.js';
 import { loadConfig } from './config.js';
 import { startRepoSyncWorker, stopRepoSyncWorker, triggerRepoSync } from './services/repo-sync-worker.js';
 import { startPipelineWorker, stopPipelineWorker } from './services/pipeline-worker.js';
-import { syncDevRepositoriesFromDisk } from './services/dev-repo-sync.js';
+import { syncAllTenantsFromDisk } from './services/dev-repo-sync.js';
 import { syncSeedSvnPasswd } from './services/svn-passwd-sync.js';
 
 async function main() {
@@ -74,7 +74,7 @@ async function main() {
 
   void (async () => {
     try {
-      const { synced, names } = await syncDevRepositoriesFromDisk();
+      const { synced, names } = await syncAllTenantsFromDisk();
       if (synced > 0) {
         app.log.info(`Auto-registered ${synced} SVN repos: ${names.join(', ')}`);
       }
