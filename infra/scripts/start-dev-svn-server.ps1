@@ -7,10 +7,16 @@
 param(
   [string]$RepoRoot = '',
   [int]$Port = 0,
-  [string[]]$RepoNames = @('Repo', 'My-Repo', 'TestRepo', 'Vinnet-Repo')
+  [string[]]$RepoNames = @('Repo', 'My-Repo', 'TestRepo', 'Vinnet-Repo'),
+  [switch]$SkipIfRunning
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($env:SKIP_SVN_START -eq '1') {
+  Write-Host 'SKIP_SVN_START=1 — skipping svnserve start.'
+  return
+}
 $getEnv = Join-Path $PSScriptRoot 'Get-EnvValue.ps1'
 
 if (-not $RepoRoot) { $RepoRoot = & $getEnv -Name 'VISUALSVN_REPO_ROOT' -Default 'D:\GMS-SVN\.dev-svn-repos' }
@@ -19,6 +25,17 @@ if ($Port -eq 0) {
   $Port = [int]$portText
 }
 $ServerHost = & $getEnv -Name 'GMS_SVN_SERVER_HOST' -Default '192.168.1.133'
+
+function Test-SvnPortListening {
+  param([int]$ListenPort)
+  return [bool](netstat -ano | Select-String ":$ListenPort\s")
+}
+
+if ($SkipIfRunning -and (Test-SvnPortListening -ListenPort $Port)) {
+  Write-Host "svnserve already listening on port $Port - skipping." -ForegroundColor Green
+  Write-Host ('  Base URL: svn://{0}:{1}' -f $ServerHost, $Port)
+  return
+}
 
 function Find-SvnExe {
   foreach ($p in @(
@@ -113,8 +130,8 @@ if (-not $listening) { throw "svnserve did not start on port $Port" }
 
 Write-Host ''
 Write-Host 'SVN server ready.' -ForegroundColor Green
-Write-Host "  Base URL: svn://${ServerHost}:$Port"
-Write-Host "  Example:  svn://${ServerHost}:$Port/Repo"
+Write-Host ('  Base URL: svn://{0}:{1}' -f $ServerHost, $Port)
+Write-Host ('  Example:  svn://{0}:{1}/Repo' -f $ServerHost, $Port)
 Write-Host ''
 Write-Host 'Set Web Admin Settings -> VisualSVN URL to:'
-Write-Host "  svn://${ServerHost}:$Port"
+Write-Host ('  svn://{0}:{1}' -f $ServerHost, $Port)

@@ -103,12 +103,16 @@ function improveSvnError(stderr: string): string {
   const urlMatch = raw.match(/URL\s+'([^']+)'/i);
   const targetUrl = urlMatch?.[1] ?? '';
   let guidance =
-    'SVN server is unreachable (connection refused). Start your SVN server service and verify the configured URL/port.';
+    'SVN server is unreachable (connection refused). Start svnserve on port 3690: run infra\\scripts\\Start-Dev-Stack.bat or npm run dev after start-dev-svn-server.ps1.';
   if (targetUrl.includes('localhost')) {
     guidance +=
       ' This PC is trying to connect to itself via localhost. For another client PC, set SVN URL to your server IP/hostname instead of localhost.';
   } else if (targetUrl) {
-    guidance += ` Verify this URL is reachable in browser: ${targetUrl}`;
+    const withPort =
+      /^svn:\/\/[^/:]+(?:\/|$)/i.test(targetUrl) && !/^svn:\/\/[^/]+:\d+/i.test(targetUrl)
+        ? targetUrl.replace(/^(svn:\/\/[^/]+)/i, '$1:3690')
+        : targetUrl;
+    guidance += ` Expected URL format: ${withPort}`;
   }
   return `${raw}\n\n${guidance}`;
 }

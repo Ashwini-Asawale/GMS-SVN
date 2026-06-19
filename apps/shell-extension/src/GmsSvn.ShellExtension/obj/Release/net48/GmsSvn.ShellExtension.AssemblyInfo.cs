@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("Context-aware Explorer menu for GMS SVN working copies")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3274fdcd0ea171fe25ee72c3c6ae34abc0c019cc")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5ad3a2c07d50d63036cb5f03f9454140516b7c7f")]
 [assembly: System.Reflection.AssemblyProductAttribute("GMS SVN Explorer Menu")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GmsSvn.ShellExtension")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

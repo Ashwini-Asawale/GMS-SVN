@@ -9,10 +9,12 @@
   ],
   "scripts": {
     "postinstall": "node scripts/ensure-electron.mjs",
+    "svn:start": "powershell -NoProfile -ExecutionPolicy Bypass -File infra/scripts/start-dev-svn-server.ps1 -SkipIfRunning",
+    "predev": "npm run svn:start",
     "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "npm run dev --workspace=@gms-svn/api",
     "dev:web": "npm run dev --workspace=@gms-svn/web",
-    "dev:client": "npm run dev --workspace=@gms-svn/client",
+    "dev:client": "npm run svn:start && npm run dev --workspace=@gms-svn/client",
     "build:client": "npm run build --workspace=@gms-svn/client",
     "pack:client": "powershell -ExecutionPolicy Bypass -File infra/installer/build-single-client-installer.ps1 -SignInstaller",
     "pack:client:remote": "powershell -ExecutionPolicy Bypass -File infra/installer/build-client-for-remote.ps1 -ServerHost 192.168.1.133 -ApiBaseUrl http://192.168.1.133:3001 -VisualSvnUrl svn://192.168.1.133:3690 -SignInstaller",
